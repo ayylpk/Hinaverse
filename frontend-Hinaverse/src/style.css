@@ -1,0 +1,338 @@
+/* ============================================================
+ * 日奈宇宙 · Hinaverse —— 设计系统
+ * 方向：夜航·日奈宇宙站（深靛蓝夜空 + 琥珀月光 + 星尘紫）
+ * 一个人说出的每句话，都会成为夜空里的一颗星。
+ * ============================================================ */
+
+:root {
+  /* ---- 夜空色板 ---- */
+  --nv-bg: #0f1222; /* 深空底色 */
+  --nv-bg-2: #12162a; /* 夜空渐变亮端 */
+  --nv-glow: #1c2340; /* 远烟蓝晕（星云感） */
+  --nv-surface: rgba(23, 29, 54, 0.72); /* 玻璃面板 */
+  --nv-surface-strong: rgba(26, 33, 61, 0.92); /* 玻璃面板（悬浮态） */
+  --nv-border: rgba(255, 255, 255, 0.09);
+  --nv-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* ---- 月光（主色）：琥珀金 ---- */
+  --nv-amber: #f2b04c;
+  --nv-amber-deep: #e08f3d; /* 渐变暗端 / 按下 */
+  --nv-amber-ink: #241704; /* 琥珀上的深色文字 */
+  --nv-amber-soft: rgba(242, 176, 76, 0.13);
+  --nv-amber-glow: rgba(242, 176, 76, 0.28);
+
+  /* ---- 星尘（辅助色）：淡紫 ---- */
+  --nv-lilac: #b9a5e0;
+  --nv-lilac-soft: rgba(185, 165, 224, 0.14);
+
+  /* ---- 暖白文字阶 ---- */
+  --nv-text: #f3efe6;
+  --nv-text-soft: #a9b0c6;
+  --nv-text-muted: #6e7693;
+
+  /* ---- 聊天气泡 ---- */
+  --nv-bubble-hina: rgba(255, 255, 255, 0.055);
+  --nv-bubble-user-start: #f2b04c;
+  --nv-bubble-user-end: #e08f3d;
+
+  /* ---- 圆角：柔和的玻璃大圆角 ---- */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  /* ---- 阴影：夜空里的晕光 ---- */
+  --shadow-sm: 0 1px 2px rgba(6, 8, 18, 0.4);
+  --shadow-md: 0 12px 32px rgba(6, 8, 18, 0.45);
+  --shadow-lg: 0 24px 64px rgba(6, 8, 18, 0.55);
+  --glow-amber: 0 0 24px rgba(242, 176, 76, 0.28);
+
+  /* ---- 字体 ---- */
+  /* 霞鹜文楷做标题（月亮温润的笔触），CDN 加载，失败回退系统楷体 */
+  --font-display: 'LXGW WenKai', 'Kaiti', 'STKaiti', 'KaiTi', serif;
+  --font-body: 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+
+  font-family: var(--font-body);
+  line-height: 1.6;
+  color: var(--nv-text);
+  background: var(--nv-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--nv-bg);
+  /* 夜航背景基色：靛蓝夜空 + 右上角远烟蓝晕 */
+  background: radial-gradient(
+      1100px 600px at 85% 12%,
+      rgba(58, 72, 130, 0.22),
+      transparent 62%
+    ),
+    linear-gradient(180deg, var(--nv-bg-2) 0%, var(--nv-bg) 100%);
+  background-attachment: fixed;
+}
+
+a {
+  color: var(--nv-amber);
+  text-decoration: none;
+}
+
+/* ---- 星野底纹：三层极淡星光点，纯 CSS，聊天气氛用 ---- */
+.starfield {
+  position: relative;
+}
+.starfield::before,
+.starfield::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.starfield::before {
+  background-image: radial-gradient(
+      1px 1px at 12% 22%,
+      rgba(243, 239, 230, 0.55),
+      transparent 100%
+    ),
+    radial-gradient(1px 1px at 38% 8%, rgba(243, 239, 230, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 63% 17%, rgba(185, 165, 224, 0.5), transparent 100%),
+    radial-gradient(1px 1px at 82% 32%, rgba(243, 239, 230, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 92% 9%, rgba(185, 165, 224, 0.45), transparent 100%),
+    radial-gradient(1px 1px at 27% 52%, rgba(243, 239, 230, 0.3), transparent 100%),
+    radial-gradient(1px 1px at 55% 71%, rgba(185, 165, 224, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 77% 63%, rgba(243, 239, 230, 0.28), transparent 100%);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+.starfield::after {
+  background-image: radial-gradient(
+      1px 1px at 22% 66%,
+      rgba(185, 165, 224, 0.42),
+      transparent 100%
+    ),
+    radial-gradient(1px 1px at 48% 38%, rgba(243, 239, 230, 0.32), transparent 100%),
+    radial-gradient(1px 1px at 68% 86%, rgba(243, 239, 230, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 88% 52%, rgba(185, 165, 224, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 7% 83%, rgba(243, 239, 230, 0.3), transparent 100%);
+  background-size: 310px 310px;
+  background-repeat: repeat;
+}
+
+/* ---- 会呼吸的星（闪烁小星，用于「正在输入」/ 装饰点）---- */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.75);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.twinkle {
+  display: inline-block;
+  animation: twinkle 1.6s ease-in-out infinite;
+}
+
+/* ---- 呼吸光晕（月亮的体温）---- */
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+/* ---- 轨道环：绕着月亮慢慢转的小星 ---- */
+@keyframes orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- 路由淡入 ---- */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* ---- 滚动条美化（暗色）---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(242, 176, 76, 0.22);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 176, 76, 0.4);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+ * Element Plus 主题覆盖 —— 夜航配色
+ * ============================================================ */
+:root {
+  /* 主色全线换成月光琥珀 */
+  --el-color-primary: #f2b04c;
+  --el-color-primary-light-3: #ffc87a;
+  --el-color-primary-light-5: rgba(242, 176, 76, 0.4);
+  --el-color-primary-light-7: rgba(242, 176, 76, 0.2);
+  --el-color-primary-light-8: rgba(242, 176, 76, 0.12);
+  --el-color-primary-light-9: rgba(242, 176, 76, 0.08);
+  --el-color-primary-dark-2: #e08f3d;
+
+  /* 容器与文字 */
+  --el-bg-color: #171d36;
+  --el-bg-color-overlay: #1c2340;
+  --el-text-color-primary: #f3efe6;
+  --el-text-color-regular: #c9cee2;
+  --el-text-color-secondary: #a9b0c6;
+  --el-text-color-placeholder: #6e7693;
+
+  /* 边框 */
+  --el-border-color: rgba(255, 255, 255, 0.14);
+  --el-border-color-light: rgba(255, 255, 255, 0.1);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.07);
+
+  /* 输入框 */
+  --el-fill-color-blank: transparent;
+  --el-fill-color-light: rgba(255, 255, 255, 0.05);
+  --el-fill-color: rgba(255, 255, 255, 0.08);
+
+  /* 遮罩/文字提示 */
+  --el-mask-color: rgba(8, 10, 22, 0.7);
+  --el-border-radius-base: var(--radius-sm);
+}
+
+/* 主按钮：琥珀月光 */
+.el-button--primary {
+  --el-button-bg-color: var(--nv-amber);
+  --el-button-border-color: transparent;
+  --el-button-text-color: var(--nv-amber-ink);
+  --el-button-hover-bg-color: #ffc87a;
+  --el-button-hover-border-color: transparent;
+  --el-button-hover-text-color: var(--nv-amber-ink);
+  --el-button-active-bg-color: var(--nv-amber-deep);
+  --el-button-active-border-color: transparent;
+  --el-button-active-text-color: #fff;
+  font-weight: 600;
+  box-shadow: var(--glow-amber);
+}
+.el-button--primary.is-disabled {
+  opacity: 0.45 !important;
+}
+
+/* 默认按钮：透明玻璃 */
+.el-button {
+  --el-button-bg-color: transparent;
+  --el-button-border-color: var(--nv-border-strong);
+  --el-button-text-color: var(--nv-text-soft);
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.06);
+  --el-button-hover-border-color: var(--nv-amber);
+  --el-button-hover-text-color: var(--nv-amber);
+}
+
+/* 输入框：玻璃质感 */
+.el-input__wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--nv-border);
+  box-shadow: none !important;
+  border-radius: var(--radius-sm) !important;
+  transition: border-color 0.2s, background 0.2s;
+}
+.el-input__wrapper.is-focus {
+  border-color: var(--nv-amber);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 3px rgba(242, 176, 76, 0.12) !important;
+}
+
+/* 下拉菜单（深色玻璃） */
+.el-dropdown__popper.el-popper {
+  background: var(--el-bg-color-overlay);
+  border-color: var(--nv-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.el-dropdown-menu {
+  background: transparent;
+}
+.el-dropdown-menu__item {
+  color: var(--nv-text-soft);
+  border-radius: 8px;
+}
+.el-dropdown-menu__item:not(.is-disabled):hover {
+  background: var(--nv-amber-soft);
+  color: var(--nv-amber);
+}
+.el-dropdown-menu__item--divided {
+  border-color: var(--nv-border);
+}
+
+/* 对话框 */
+.el-dialog {
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--nv-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.el-dialog__title {
+  color: var(--nv-text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* 分割线 */
+.el-divider__text {
+  color: var(--nv-text-muted);
+  font-size: 12px;
+}
+
+/* 消息提示 */
+.el-message {
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(10px);
+}
+
+/* 尊重系统减少动态偏好：关掉所有呼吸/闪烁/旋转 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

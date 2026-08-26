@@ -1,0 +1,32 @@
+# 敏感配置
+.env
+
+# 运行时个人数据
+data/chroma/
+data/sqlite/
+data/daily/
+data/*.txt
+data/photo/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# IDE
+.idea/
+.vscode/
+
+# Docker
+.docker/
+
+# 打包文件（hina.tar 535MB，禁止入库）
+*.tar
+
+# LangGraph 临时文件
+.langgraph_api/
+resources/
+
+# OS
+.DS_Store
+Thumbs.db

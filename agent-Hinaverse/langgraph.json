@@ -1,0 +1,10 @@
+{
+  "python_version": "3.12",
+  "dependencies": [
+    "."
+  ],
+  "graphs": {
+    "hina": "agent_hina.graph:build_hina_graph"
+  },
+  "env": ".env"
+}
