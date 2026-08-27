@@ -3,9 +3,14 @@ WebSocket 端点：ws://host/ws?token=<jwt>
 
 职责：
 - 握手校验 token，失败关闭连接（不接受）
-- 维护连接到 push_channel（在线推送走这里）
+- 维护连接到 outbound_hub（在线推送走这里）
 - 心跳：每 30s 发 ping，60s 无任何入站消息则断开
-- 处理 {type:"message"}：落库用户消息 → 发 typing → 生成回复 → 落库 → 推送
+- 消息分发：receive 循环拿到 {type:...} 后丢给 inbound_hub，
+  由已注册的 handler 处理（如 message → 落库/安全检测/生成回复/推送）
+
+Hub 约定（见 Hub.py）：
+  InboundHub  只管 type → handler 分发，业务留在本文件的 _handle_message
+  OutboundHub 统一出口，所有下发（回复/typing/system/主动消息）都经过它
 """
 import asyncio
 import json
@@ -17,10 +22,15 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
 
 from app.database import SyncSessionLocal
-from app.models import Conversation, Message, User
+from app.models import Conversation, CrisisEvent, Message, User
 from app.security import decode_token
-from app.services.agent_service import generate_reply
-from app.services.push import push_channel
+from app.ws.Hub import inbound_hub, outbound_hub
+from app.ws.services.agent_service import generate_reply
+from app.ws.services.safety_service import (
+    check_message,
+    generate_crisis_summary,
+    generate_high_risk_reply,
+)
 from app.utils import now_hm
 from app.ws import protocol as P
 
@@ -31,6 +41,10 @@ router = APIRouter()
 # 心跳参数
 PING_INTERVAL = 30      # 每 30s 发一次 ping
 IDLE_TIMEOUT = 60       # 60s 无入站消息则断开
+
+
+# ── 注册 InboundHub 处理器：以后新增消息类型（如 diary），在这里多注册一个 ──
+inbound_hub.register(P.TYPE_MESSAGE, lambda ws, user, data: _handle_message(user, data))
 
 
 @router.websocket("/ws")
@@ -45,7 +59,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
-    push_channel.register_ws(user.id, websocket)
+    outbound_hub.register_ws(user.id, websocket)
     logger.info(f"[ws] 用户 {user.id}({user.nickname}) 已连接")
 
     # 最后一次收到消息的时间戳，用于心跳判断
@@ -72,7 +86,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
     hb_task = asyncio.create_task(heartbeat())
 
-    # ── 3. 接收循环 ──
+    # ── 3. 接收循环：交给 InboundHub 分发 ──
     try:
         while True:
             raw = await websocket.receive_text()
@@ -89,17 +103,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             if msg_type == P.TYPE_PONG:
                 continue
 
-            # 用户发消息
-            if msg_type == P.TYPE_MESSAGE:
-                await _handle_message(websocket, user, data)
-            # 其他类型忽略
+            # 分发到 InboundHub；未注册的类型（如预留的 diary）直接忽略
+            handled = await inbound_hub.handle(msg_type, websocket, user, data)
+            if not handled:
+                logger.debug(f"[ws] 用户 {user.id} 发送了未注册类型: {msg_type}")
     except WebSocketDisconnect:
         logger.info(f"[ws] 用户 {user.id} 断开连接")
     except Exception as e:
         logger.error(f"[ws] 用户 {user.id} 异常: {e}")
     finally:
         hb_task.cancel()
-        push_channel.unregister_ws(user.id)
+        outbound_hub.unregister_ws(user.id)
 
 
 async def _authenticate(token: str) -> User | None:
@@ -117,22 +131,25 @@ async def _authenticate(token: str) -> User | None:
         return result.scalar_one_or_none()
 
 
-async def _handle_message(websocket: WebSocket, user: User, data: dict[str, Any]) -> None:
-    """处理一条用户消息：校验会话 → 落库用户消息 → typing → 生成回复 → 落库 → 推送"""
+async def _handle_message(user: User, data: dict[str, Any]) -> None:
+    """
+    处理一条用户消息：校验会话 → 落库用户消息 → 安全检测 → 生成回复 → 落库 → 推送。
+    从 InboundHub 注册进来，所有下发走 outbound_hub（在线 WS / 离线极光）。
+    """
     conversation_id = data.get("conversation_id")
     content = (data.get("content") or "").strip()
     if not conversation_id or not content:
         return
 
     with SyncSessionLocal() as db:
-        # 校验会话归属
+        # 0. 校验会话归属（越权返回，什么都不做）
         conv = db.execute(
             select(Conversation).where(
                 Conversation.id == conversation_id, Conversation.user_id == user.id
             )
         ).scalar_one_or_none()
         if conv is None:
-            await websocket.send_json({"type": P.TYPE_SYSTEM, "content": "会话不存在"})
+            await outbound_hub.send_system(user.id, "会话不存在")
             return
 
         # 1. 落库用户消息
@@ -144,10 +161,7 @@ async def _handle_message(websocket: WebSocket, user: User, data: dict[str, Any]
         db.commit()
         db.refresh(user_msg)
 
-        # 2. 通知前端「正在输入」
-        await websocket.send_json({"type": P.TYPE_TYPING, "conversation_id": conv.id})
-
-        # 3. 取最近历史上下文
+        # 2. 取最近历史上下文（供安全检测 + agent 复用）
         hist = db.execute(
             select(Message)
             .where(Message.conversation_id == conv.id)
@@ -155,12 +169,73 @@ async def _handle_message(websocket: WebSocket, user: User, data: dict[str, Any]
             .limit(20)
         ).scalars().all()
         history = [{"role": m.role, "content": m.content} for m in reversed(hist)]
+        # 安全检测用的最近上下文字符串（最近 5 条）
+        recent_context = "\n".join(
+            f"{h['role']}: {h['content']}" for h in history[-5:]
+        )
+
+        # 3. 安全检测（三阶段漏斗）
+        safety = await check_message(user.id, content, recent_context)
+
+        # ── 分支 A：违禁词拦截 ──
+        if safety.blocked:
+            # 不进入 agent，记录事件后直接返回拦截提示
+            _save_crisis_event(db, user.id, conv.id, safety, status="pending_human")
+            db.commit()
+            await outbound_hub.send_system(user.id, "这条消息无法发送。")
+            return
+
+        # ── 分支 B：高危 → 过渡话术 + 转人工，不调 agent ──
+        if safety.risk_level == "高危":
+            transition = await generate_high_risk_reply(content)
+            # 落库危机事件 + 自动生成摘要（best-effort）
+            summary = await generate_crisis_summary(
+                trigger_reason=safety.reason,
+                recent_messages=recent_context,
+                llm_comfort_log=transition,
+            )
+            _save_crisis_event(
+                db, user.id, conv.id, safety,
+                status="pending_human", summary=summary, comfort_log=transition,
+            )
+            db.commit()
+            # 落库日奈过渡消息
+            hina_msg = Message(
+                conversation_id=conv.id, role="hina", content=transition, time=now_hm()
+            )
+            db.add(hina_msg)
+            conv.last_message = transition
+            db.commit()
+            db.refresh(hina_msg)
+            await outbound_hub.send_message(user.id, conv.id, {
+                "id": hina_msg.id,
+                "role": hina_msg.role,
+                "content": hina_msg.content,
+                "time": hina_msg.time,
+            })
+            return
+
+        # ── 分支 C：中/低危 → 正常 agent，但开启深度安抚 ──
+        needs_deep_comfort = safety.risk_level in ("中危")
+        if needs_deep_comfort:
+            # 落库危机事件（LLM 安抚中）
+            _save_crisis_event(db, user.id, conv.id, safety, status="comforting")
+            db.commit()
+
+        # 4. 通知前端「正在输入」
+        await outbound_hub.send_typing(user.id, conv.id)
+
+        # 5. 生成回复（真实接入 agent 图：先回复，压缩后台异步）
         user_profile = {"nickname": user.nickname, "avatar": user.avatar}
+        reply = await generate_reply(
+            content,
+            user_profile,
+            history,
+            needs_deep_comfort=needs_deep_comfort,
+            user_id=user.id,
+        )
 
-        # 4. 生成回复（mock，真实接入时只改 agent_service）
-        reply = await generate_reply(content, user_profile, history)
-
-        # 5. 落库日奈消息
+        # 6. 落库日奈消息
         hina_msg = Message(
             conversation_id=conv.id, role="hina", content=reply, time=now_hm()
         )
@@ -169,14 +244,33 @@ async def _handle_message(websocket: WebSocket, user: User, data: dict[str, Any]
         db.commit()
         db.refresh(hina_msg)
 
-        # 6. 推送给前端
-        await websocket.send_json({
-            "type": P.TYPE_MSG,
-            "conversation_id": conv.id,
-            "msg": {
-                "id": hina_msg.id,
-                "role": hina_msg.role,
-                "content": hina_msg.content,
-                "time": hina_msg.time,
-            },
+        # 7. 推送给前端
+        await outbound_hub.send_message(user.id, conv.id, {
+            "id": hina_msg.id,
+            "role": hina_msg.role,
+            "content": hina_msg.content,
+            "time": hina_msg.time,
         })
+
+
+def _save_crisis_event(
+    db,
+    user_id: int,
+    conversation_id: int,
+    safety,
+    status: str,
+    summary: dict | None = None,
+    comfort_log: str = "",
+) -> None:
+    """落库一条危机事件（多用户隔离：带 user_id）"""
+    event = CrisisEvent(
+        user_id=user_id,
+        conversation_id=conversation_id,
+        risk_level=safety.risk_level,
+        trigger=safety.reason,
+        signal=safety.signal,
+        status=status,
+        summary=summary,
+        comfort_log=comfort_log,
+    )
+    db.add(event)

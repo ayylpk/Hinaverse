@@ -5,19 +5,15 @@ agent_think 节点 —— LLM 决策核心
 
 状态提取优先走 update_state 这个 tool call（DeepSeek 稳定输出）。
 万一没调，用 regex 扫 ---STATE--- 块兜底。
-两个都失败就从回复文本猜心情。
 """
 import json
 import re
 from datetime import datetime
-from dotenv import load_dotenv
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 
 from agent_hina.state import AgentState
 from agent_hina.tools import model_with_tools
 from agent_hina import prompts
-
-load_dotenv()
 
 WINDOW_SIZE = 20  # 每轮送 LLM 的消息条数上限，超出用摘要
 
@@ -78,29 +74,6 @@ def extract_state(response: AIMessage) -> tuple[AIMessage, dict]:
     return response, {}
 
 
-# ═══════════════════════════════════════════════════════════════════
-# 兜底：从回复文本猜心情
-# ═══════════════════════════════════════════════════════════════════
-
-_MOOD_PATTERNS: list[tuple[str, str]] = [
-    ("累了|困了|想睡|晚安|睡觉|去睡", "困倦"),
-    ("开心|太好了|嘿嘿|嗯嗯|好啊|行啊", "开心"),
-    ("对不起|抱歉|我的错|怪我", "愧疚"),
-    ("担心|你没事|还好吗|没事吧|小心", "担心"),
-    ("谢谢|多谢|……谢|感谢", "感激"),
-    ("嗯|好|知道了|明白了|去吧|路上", "平静"),
-    ("烦|头疼|累|唉|叹气|难受", "关切"),
-]
-
-
-def _infer_mood(text: str) -> str:
-    """从回复文本猜日奈心情，pattern 一个个试"""
-    for pattern, mood in _MOOD_PATTERNS:
-        if re.search(pattern, text):
-            return mood
-    return "普通"
-
-
 # ── 对话收尾检测，命中任一 → 需要存记忆 ──
 _ENDING_PATTERNS = [
     "再见", "拜拜", "晚安", "早点回来", "路上小心", 
@@ -115,44 +88,6 @@ def _infer_need_save(user_text: str) -> bool:
             print(f"  [infer_need_save] 命中「{pattern}」→ need_to_save_memory = true")
             return True
     return False
-
-
-# ═══════════════════════════════════════════════════════════════════
-# 场景推导
-# ═══════════════════════════════════════════════════════════════════
-
-def _infer_scene(status: str) -> str:
-    """从 status 关键词推当前场景，关键词都匹配不到时按时间段推断"""
-    s = status or ""
-    if any(w in s for w in ["刚醒", "起床", "洗漱", "赖床", "醒了"]):
-        return "刚醒来，准备开始一天"
-    if any(w in s for w in ["做饭", "晚饭", "早饭", "厨房", "煮"]):
-        return "在家，厨房"
-    if any(w in s for w in ["沙发", "休息", "午休", "看书"]):
-        return "在家，休息"
-    if any(w in s for w in ["散步", "湖边", "公园"]):
-        return "在外面散步"
-    if any(w in s for w in ["咖啡", "书店"]):
-        return "在咖啡店"
-    if any(w in s for w in ["在家", "家里", "公寓"]):
-        return "在家"
-
-    # 关键词全没命中 → 按时间段猜
-    hour = datetime.now().hour
-    if 6 <= hour < 9:
-        return "刚醒来，准备开始一天"
-    elif 9 <= hour < 12:
-        return "安静地待着，随时准备倾听"
-    elif 12 <= hour < 14:
-        return "在家，午休"
-    elif 14 <= hour < 18:
-        return "安静地待着，随时准备倾听"
-    elif 18 <= hour < 20:
-        return "在家，准备晚饭"
-    elif 20 <= hour < 23:
-        return "在家"
-    else:
-        return "在家，准备休息"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -176,44 +111,25 @@ def agent_think_node(state: AgentState) -> dict:
 
     # ── 用户档案/画像（当前为空，未来由画像系统（AgentMemory）经接口注入）──
     relationship_context = state.get("_portrait", "") or ""
-    pending_agreements = ""
 
-    # ── 选 prompt ──
-    status = state.get("status", "") or "在线"
-    scene = _infer_scene(status)
-    print(f"  [agent_think] scene={scene}")
 
     system_text = prompts.SYSTEM_PROMPT.format(
         time=now.strftime("%Y年%m月%d日 %H:%M"),
         relationship_context=relationship_context or "（暂无用户档案）",
-        pending_agreements=pending_agreements or "（暂无待办约定）",
-        mood=state.get("mood", "思考中"),
-        status=status,
-        scene=scene,
     )
 
-    # ── RAG 前置检索 —— 每次回复前强制检索，是否提起由 LLM 自行判断 ──
-    remembered: list[str] = []
-    query_text = (latest_text or "").strip()
-    if query_text:
-        try:
-            from agent_hina.nodes.retriever import get_retriever
-            docs, dists = get_retriever().retrieve(query_text, n=3)
-            # L2 距离 < 1.0 视为相关（与 load_memory 工具同标准）
-            remembered = [d for d, dist in zip(docs, dists) if dist < 1.0]
-            if remembered:
-                print(f"  [agent_think] 检索到 {len(remembered)} 条相关记忆")
-        except Exception as e:
-            print(f"  [agent_think] 记忆检索失败(降级为无记忆): {e}")
-
-    if remembered:
-        mem_block = (
-            "\n\n【隐约想起的片段——是否提起由你判断】\n"
-            + "\n".join(f"- {m}" for m in remembered)
-            + "\n（与当前话题相关且自然就带出来；无关或生硬就忽略。"
-              "禁止逐条复述、禁止刻意引用「我记得」式开场。）"
+    # ── 深度安抚模式：中/低危安全命中时，用 SAFETY_COMFORT_LOW_PROMPT 覆写系统提示词末尾 ──
+    if state.get("needs_deep_comfort"):
+        # 从完整对话历史取最近 5 条（含日奈回复），让安抚模式有上下文可依
+        recent_ctx = "\n".join(
+            f"{'用户' if isinstance(m, HumanMessage) else '日奈'}: {getattr(m, 'content', '')}"
+            for m in all_msgs[-5:]
         )
-        system_text += mem_block
+        comfort_prompt = prompts.build_safety_comfort_low_prompt(
+            user_message=latest_text, recent_context=recent_ctx
+        )
+        system_text += "\n\n" + comfort_prompt
+        print("  [agent_think] 深度安抚模式已开启")
 
     # ── 滑动窗口 ──
     all_msgs = state["messages"]
@@ -240,7 +156,7 @@ def agent_think_node(state: AgentState) -> dict:
 
     # ── 兜底：模型只调了工具没说话（content 为空，偶发）→ 强制生成回复 ──
     content_text = clean_response.content or ""  # type: ignore
-    if not content_text.strip():
+    if not content_text.strip(): # type: ignore
         if latest_text:
             # LLM 只调了工具没说话 → 补一句自然回复，避免空回复丢消息
             fallback_topic = latest_text
@@ -260,12 +176,6 @@ def agent_think_node(state: AgentState) -> dict:
             except Exception as e:
                 print(f"  [agent_think] 补生成失败: {e}")
 
-    # ── 兜底：mood / status 还是空的就猜 ──
-    reply_text = clean_response.content or ""  # type: ignore
-    if not state_updates.get("mood"):
-        state_updates["mood"] = _infer_mood(reply_text) # type: ignore
-    if not state_updates.get("status"):
-        state_updates["status"] = "在线"
 
     # ── 兜底：LLM 没调 update_state → 规则检测是否需要存记忆 ──
     if "need_to_save_memory" not in state_updates:
@@ -278,6 +188,5 @@ def agent_think_node(state: AgentState) -> dict:
     return {
         "messages": [clean_response],
         "short_session_memory": short_mem,
-        "remembered_memories": remembered,
         **state_updates,
     }

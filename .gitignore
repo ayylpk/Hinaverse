@@ -5,5 +5,6 @@
 # ===== agent 工作日志（含对话记忆，不入库）=====
 .workbuddy/
 
-# ===== 遗留空占位文件 =====
+# ===== 遗留空占位文件 / 任务书（不入库）=====
 prompt.txt
+AGENT_TASK_PROMPT.md

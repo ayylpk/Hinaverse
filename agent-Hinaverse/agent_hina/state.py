@@ -9,7 +9,7 @@ needs_human:          是否需要暂停等用户确认
 mood:                 日奈现在的情绪
 status:               日奈现在在做什么
 tool_results:         本轮工具调用结果列表
-remembered_memories:  每次回复前 RAG 检索到的记忆片段
+needs_deep_comfort:   中/低危安全检测命中时为 True，触发深度安抚模式提示词覆写
 """
 from typing import Annotated
 from typing_extensions import TypedDict
@@ -25,5 +25,5 @@ class AgentState(TypedDict):
     mood: str                                   # 日奈现在的情绪
     status: str                                 # 日奈现在在做什么
     tool_results: list                          # 本轮工具调用结果列表
-    remembered_memories: list                   # 每次回复前 RAG 检索到的记忆片段
     _daily_summary_text: str                    # 日终压缩产出的「给用户的日终陪伴总结」（backend 取走落库/推送）
+    needs_deep_comfort: bool                    # 中/低危命中时由 backend 传入，触发深度安抚模式

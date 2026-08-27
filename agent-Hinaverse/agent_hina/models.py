@@ -1,7 +1,19 @@
+"""
+models.py —— agent 层 LLM 模型统一封装（唯一入口）
+
+所有需要调 LLM 的地方（聊天 / 记忆压缩 / 安全检测 / 澄清 / 主动消息）
+都用这里的模型实例，不自行发 HTTP 请求。backend 通过 import agent_hina.* 复用本封装。
+
+注意：显式加载 agent-Hinaverse/.env（与 graph.py 一致），
+保证被 backend import 时（cwd 在 backend 目录）也能读到 DEEPSEEK_API_KEY 等配置。
+"""
+from pathlib import Path
 from dotenv import load_dotenv
 from langchain_deepseek import ChatDeepSeek
 
-load_dotenv()
+# 显式加载本项目的 .env，不依赖调用方的工作目录
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+load_dotenv(_ENV_FILE)
 
 
 def create_model(temperature: float = 0.7, timeout: int = 120):
@@ -16,19 +28,13 @@ def create_model(temperature: float = 0.7, timeout: int = 120):
 chat_model = create_model(0.8)
 #存储记忆
 save_memory_model = create_model(0.2)
-#加载记忆
-load_memory_model = create_model(0.2)
-#执行工具
-tool_model = create_model(0.1)
+#加载记忆（已移除 RAG，保留占位）
+load_memory_model = None  # type: ignore
 #寻求帮助
 ask_human_model = create_model(0.5)
-#选择
-route_model = create_model(0.0)
 #压缩记忆（内容大，给更长超时）
 reduce_model = create_model(0.0, timeout=300)
-#定时发消息/任务
+#定时主动发送消息（主动关怀）
 schedule_model = create_model(0.9)
-#判断是否应该产生想法
-judge_model = create_model(0.0)
 #写日记（内容大，给更长超时）
 write_model = create_model(0.9, timeout=300)

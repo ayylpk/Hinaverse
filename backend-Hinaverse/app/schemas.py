@@ -84,3 +84,30 @@ class RegIdRequest(BaseModel):
 
 class ActiveRequest(BaseModel):
     conversation_id: int
+
+
+# ═══════════════════════════════════════
+# 危机事件（运营端）
+# ═══════════════════════════════════════
+
+class CrisisEventOut(BaseModel):
+    id: int
+    user_id: int
+    conversation_id: int | None = None
+    risk_level: str
+    trigger: str = ""
+    signal: str = ""
+    status: str = "pending_human"
+    summary: dict | None = None
+    intervention_result: str = ""
+    comfort_log: str = ""
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CrisisInterventionRequest(BaseModel):
+    """人工标记干预结果"""
+    intervention_result: str = Field(..., min_length=1, max_length=64)
+    resolved: bool = Field(True, description="是否标记为已解决")

@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS
 from app.database import init_db
-from app.routers import auth, conversations, device, dev
+from app.routers import auth, conversations, crisis, device, dev
 from app.ws.ws import router as ws_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -38,6 +38,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(conversations.router)
 app.include_router(device.router)
+app.include_router(crisis.router)
 app.include_router(dev.router)
 
 # WebSocket 路由

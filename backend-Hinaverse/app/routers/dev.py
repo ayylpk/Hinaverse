@@ -11,8 +11,8 @@ from app.database import get_db
 from app.models import Conversation, Message, User
 from app.schemas import ActiveRequest
 from app.security import get_current_user
-from app.services.agent_service import generate_reply
-from app.services.push import push_channel
+from app.ws.Hub import outbound_hub
+from app.ws.services.agent_service import generate_reply
 from app.utils import now_hm
 
 router = APIRouter(prefix="/api/dev", tags=["dev"])
@@ -68,7 +68,7 @@ async def trigger_active_message(
     await db.commit()
     await db.refresh(msg)
 
-    # 推送：在线走 WS，离线走极光
+    # 推送：统一走 outbound_hub（在线 WS，离线极光；_reg_id 给极光用）
     push_msg = {
         "type": "active",
         "conversation_id": conv.id,
@@ -80,6 +80,6 @@ async def trigger_active_message(
         },
         "_reg_id": current_user.reg_id,
     }
-    delivered = await push_channel.push(current_user.id, conv.id, push_msg)
+    delivered = await outbound_hub.push(current_user.id, push_msg)
 
     return {"ok": True, "delivered": delivered, "message": reply}

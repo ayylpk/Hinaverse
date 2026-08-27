@@ -33,7 +33,7 @@ def _read_relationship_context() -> str:
 
 
 def daily_compress_node(state: AgentState) -> dict:
-    """日终：轻度压缩今日记忆 + 生成给用户的日终总结"""
+    """日终：压缩今日记忆 + 生成给用户的日终总结"""
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
 

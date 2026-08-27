@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import Conversation, Message, User
 from app.schemas import ConversationOut, MessageListResponse, MessageOut
 from app.security import get_current_user
-from app.services.agent_service import generate_reply
+from app.ws.services.agent_service import generate_reply
 from app.utils import now_hm
 
 router = APIRouter(prefix="/api/conversations", tags=["conversations"])
