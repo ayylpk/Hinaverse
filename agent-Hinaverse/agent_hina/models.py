@@ -28,13 +28,9 @@ def create_model(temperature: float = 0.7, timeout: int = 120):
 chat_model = create_model(0.8)
 #存储记忆
 save_memory_model = create_model(0.2)
-#加载记忆（已移除 RAG，保留占位）
-load_memory_model = None  # type: ignore
 #寻求帮助
 ask_human_model = create_model(0.5)
 #压缩记忆（内容大，给更长超时）
 reduce_model = create_model(0.0, timeout=300)
-#定时主动发送消息（主动关怀）
-schedule_model = create_model(0.9)
-#写日记（内容大，给更长超时）
+#写日记/日终总结（内容大，给更长超时）
 write_model = create_model(0.9, timeout=300)

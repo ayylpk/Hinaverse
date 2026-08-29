@@ -4,8 +4,7 @@
 WS 连接表已上移给 Hub.OutboundHub（统一出口：在线走 WS，离线调这里）。
 极光配置缺失时静默降级（打日志不报错）。
 
-复用 agent_hina/jpush.py 的实现思路，但按用户维度存 reg_id，
-不直接 import agent-Hinaverse（本轮要求不 import 它）。
+按用户维度存 reg_id（User.reg_id），多用户隔离。
 """
 import base64
 import logging

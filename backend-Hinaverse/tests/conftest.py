@@ -1,73 +1,54 @@
 """
-测试配置：用独立的测试数据库覆盖 get_db 依赖。
+测试配置：用独立的 SQLite 测试库覆盖 get_db 依赖，不连真实 MySQL。
+数据访问已统一为同步 DAO，测试同样走同步引擎。
 """
-import asyncio
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base, get_db
 from app.main import app
 
+# TestClient 启动会触发 lifespan → init_db()；测试库用 sqlite，模块级屏蔽真实建表（不连 MySQL）
+import app.main as main_mod
+main_mod.init_db = lambda: None
+
 # 测试用独立 sqlite 文件，跑完不污染开发库
 _TEST_DB = Path(__file__).resolve().parent.parent / "test_hina.db"
-TEST_DB_URL = f"sqlite+aiosqlite:///{_TEST_DB}"
-# 同步版 URL（WebSocket 路径用）
 TEST_SYNC_DB_URL = f"sqlite:///{_TEST_DB}"
 
-# 异步测试引擎 + session 工厂
-test_engine = create_async_engine(TEST_DB_URL, echo=False, future=True)
-TestSessionLocal = async_sessionmaker(
-    test_engine, class_=AsyncSession, expire_on_commit=False, autoflush=False
-)
-
-# 同步测试引擎 + session 工厂（供 WebSocket 路径使用）
+# 同步测试引擎 + session 工厂（REST 与 WebSocket 共用，同步 DAO 无循环绑定问题）
 test_sync_engine = create_engine(TEST_SYNC_DB_URL, echo=False, future=True)
 TestSyncSessionLocal = sessionmaker(bind=test_sync_engine, expire_on_commit=False)
 
 
-@pytest.fixture(scope="session")
-def event_loop():
-    """pytest-asyncio 需要事件循环 fixture"""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_db():
-    """建表 + 测试结束后清理"""
-    # 异步引擎建表（同步引擎指向同一文件，可见相同表结构）
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+@pytest.fixture(scope="session", autouse=True)
+def setup_db():
+    """建表 + 测试结束后清理（不连真实 MySQL）"""
+    Base.metadata.create_all(test_sync_engine)
     yield
-    async with test_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    # 关闭引擎释放文件句柄，避免 Windows 下删文件失败
-    await test_engine.dispose()
+    Base.metadata.drop_all(test_sync_engine)
     test_sync_engine.dispose()
     if _TEST_DB.exists():
         try:
             _TEST_DB.unlink()
-        except PermissionError:
+        except (PermissionError, OSError):
             pass
 
 
-async def _override_get_db():
-    async with TestSessionLocal() as session:
+def _override_get_db():
+    """覆盖 REST 路由的 get_db 依赖（同步生成器）"""
+    with TestSyncSessionLocal() as session:
         yield session
 
 
-# 覆盖 REST 路由的 get_db 依赖
 app.dependency_overrides[get_db] = _override_get_db
 
 
-# 覆盖 WebSocket 路径的同步 session 工厂
 @pytest.fixture(autouse=True)
 def _patch_ws_session(monkeypatch):
     """把 ws 模块里的 SyncSessionLocal 替换为测试库的同步工厂"""

@@ -1,12 +1,12 @@
 """
 ORM 模型：User / Conversation / Message / CrisisEvent。
 字段命名与前端协议对齐，方便以后直接做响应序列化。
+数据操作请走 app/repositories/（DAO 层），本文件只定义表结构。
 """
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
-from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 
@@ -15,7 +15,6 @@ class User(Base):
     """用户表"""
     __tablename__ = "users"
 
-    # SQLite 自增主键必须用 Integer（BIGINT 不支持 AUTOINCREMENT）
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -91,7 +90,7 @@ class CrisisEvent(Base):
     signal: Mapped[str] = mapped_column(Text, default="", nullable=False)
     # 状态：pending_human（待人工）/ comforting（LLM 安抚中）/ resolved（已处理）
     status: Mapped[str] = mapped_column(String(32), default="pending_human", nullable=False)
-    # 危机摘要（JSON，build_safety_summary_prompt 生成）
+    # 危机摘要（dict：高危存 {"quick_summary": ...}，快速浓缩文本）
     summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # 人工干预结果：成功安抚 / 转介医院 / 报警 / 用户拒绝沟通 / 误报 等
     intervention_result: Mapped[str] = mapped_column(String(64), default="", nullable=False)
@@ -102,74 +101,32 @@ class CrisisEvent(Base):
 
     user: Mapped["User"] = relationship()
 
-def insert_message(
-    db: Session,
-    conversation_id: int,
-    role: str,
-    content: str,
-    time: Optional[str] = None
-) -> Message:
-    """
-    插入一条消息到数据库
-    
-    Args:
-        db: 数据库会话
-        conversation_id: 会话ID
-        role: 角色 ('user' | 'hina' | 'system')
-        content: 消息内容
-        time: 显示时间 (HH:mm)，不传则自动生成
-    
-    Returns:
-        插入的 Message 对象
-    """
-    if time is None:
-        time = datetime.now().strftime("%H:%M")
-    
-    message = Message(
-        conversation_id=conversation_id,
-        role=role,
-        content=content,
-        time=time
-    )
-    
-    db.add(message)
-    db.commit()
-    db.refresh(message)
-    
-    return message
+
+class SendMessage(Base):
+    """极简消息存取（sendMessage 接口）：id / user_id / content。"""
+    __tablename__ = "send_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
 
 
-def insert_messages_batch(
-    db: Session,
-    conversation_id: int,
-    messages: list[dict]
-) -> list[Message]:
-    """
-    批量插入消息
-    
-    Args:
-        db: 数据库会话
-        conversation_id: 会话ID
-        messages: 消息列表，每项为 {'role': str, 'content': str}
-    
-    Returns:
-        插入的 Message 对象列表
-    """
-    inserted = []
-    now = datetime.now().strftime("%H:%M")
-    
-    for msg in messages:
-        message = Message(
-            conversation_id=conversation_id,
-            role=msg['role'],
-            content=msg['content'],
-            time=msg.get('time', now)
-        )
-        db.add(message)
-        inserted.append(message)
-    
-    db.commit()
-    for msg in inserted:
-        db.refresh(msg)
-    
-    return inserted
+class Diary(Base):
+    """日记：id / user_id / content / created_at（按用户隔离）"""
+    __tablename__ = "diaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+
+
+class HighRiskSummary(Base):
+    """高危摘要：确认高危后快速生成的对话浓缩（id / user_id / content 三列）。
+    独立表存高危摘要，与普通消息/日记隔离。"""
+    __tablename__ = "high_risk_summaries"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+

@@ -111,3 +111,37 @@ class CrisisInterventionRequest(BaseModel):
     """人工标记干预结果"""
     intervention_result: str = Field(..., min_length=1, max_length=64)
     resolved: bool = Field(True, description="是否标记为已解决")
+
+
+# ═══════════════════════════════════════
+# 极简消息（sendMessage 接口）
+# ═══════════════════════════════════════
+
+class SendMessageCreate(BaseModel):
+    """插入消息：user_id 不传（由 JWT token 决定当前用户）"""
+    content: str = Field(..., min_length=1, max_length=10000)
+
+
+class SendMessageOut(BaseModel):
+    id: int
+    user_id: int
+    content: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ═══════════════════════════════════════
+# 日记（dairy 接口）
+# ═══════════════════════════════════════
+
+class DiaryCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=20000)
+
+
+class DiaryOut(BaseModel):
+    id: int
+    user_id: int
+    content: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

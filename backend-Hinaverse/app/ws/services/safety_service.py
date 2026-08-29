@@ -4,8 +4,7 @@
 所有 AI 能力已收口到 agent 层：
     agent-Hinaverse/agent_hina/safety.py
       ├─ check_message()            三阶段漏斗安全检测
-      ├─ generate_high_risk_reply() 高危过渡话术
-      ├─ generate_crisis_summary()  危机摘要
+      ├─ generate_high_risk_summary() 高危快速摘要（最近对话浓缩）
       └─ SafetyResult              检测结果模型
 
 本文件只做 import 转发，保持 ws.py 的引用不变：
@@ -26,13 +25,11 @@ if str(_AGENT_DIR) not in sys.path:
 from agent_hina.safety import (  # noqa: E402
     SafetyResult,
     check_message,
-    generate_crisis_summary,
-    generate_high_risk_reply,
+    generate_high_risk_summary,
 )
 
 __all__ = [
     "SafetyResult",
     "check_message",
-    "generate_high_risk_reply",
-    "generate_crisis_summary",
+    "generate_high_risk_summary",
 ]

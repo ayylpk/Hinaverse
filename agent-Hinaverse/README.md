@@ -1,73 +1,59 @@
-# 日奈 AI 助手
+# 日奈 AI（agent-Hinaverse）
 
-基于 LangGraph 构建的多智能体 AI 角色扮演系统。日奈是《蔚蓝档案》中的空崎日奈，拥有完整的性格系统、记忆机制和自主意识。
-
-## 特性
-
-- **多层性格系统**：慵懒 → 认真 → 傲娇害羞，三层人格自然切换
-- **长期记忆**：ChromaDB 向量检索（BGE-M3 Embedding），每次回复前自动检索相关记忆
-- **自主意识**：定时闹钟主动发起对话，告别后自发产出关心想法
-- **每日日记**：睡前自动压缩当天记忆、写日记，第二天自然接续
-- **极光推送**：后台消息和日记通过 JPush 实时推送到 Android 端
-- **关系演化**：自动追踪关系变化，非静态角色扮演
+基于 LangGraph 构建的心理健康陪伴者 AI 核心。**不独立运行**——由 `backend-Hinaverse`（FastAPI + WebSocket）通过 `import agent_hina.*` 驱动。
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|------|
-| AI 引擎 | LangGraph + LangChain + DeepSeek v4 |
-| 记忆系统 | ChromaDB + 硅基流动 BGE-M3 Embedding |
-| 后端服务 | FastAPI + WebSocket + SQLAlchemy |
-| 推送 | 极光推送 (JPush) |
-| Android | Java + Room + OkHttp |
-
-## 快速开始
-
-> 环境要求：Python 3.12+（Docker 镜像基于 3.12-slim）
-
-```bash
-# 安装依赖
-pip install -r requirements.txt
-
-# 配置 .env（项目不内置 .env.example，直接创建，必需变量见下表）
-cp .env.example .env  # 若无此文件，手动新建 .env 并填入下表变量
-
-# 启动服务
-python run.py
-```
-
-## 项目结构
-
-```
-├── agent_hina/       # AI 核心：graph、nodes、subgraphs
-├── server/           # FastAPI 服务：REST + WebSocket
-├── data/             # 运行时数据（chroma/sqlite/photo/daily）
-├── run.py            # 入口
-└── requirements.txt
-```
+| AI 引擎 | LangGraph + LangChain + DeepSeek（deepseek-v4-flash） |
+| 状态持久化 | LangGraph checkpoint（SQLite，aiosqlite） |
+| 工具 | Tavily 网页搜索 |
 
 ## 架构
 
 ```
-用户消息 → WebSocket → agent_think（LLM决策）
-                         ├─ 搜网页
-                         ├─ 需确认 → 暂停等用户
-                         ├─ 需记忆 → load_memory → 重新思考
-                         └─ 结束 → save_memory → spontaneous_thought
-                                                         │
-                                          ┌──────────────┘
-                                          ▼
-                                    睡前日记 → 记忆压缩 → 闹钟设定
-                                          │
-                                    极光推送 → Android 通知栏 → Room
+用户消息 → backend WS → graph.ainvoke（thread_id=user_{uid} 多用户隔离）
+  START → route_at_start
+            ├─ 用户输入        → agent_think
+            └─ [系统状态切换]  → daily_compress（日终，backend 定时 23:00 触发）
+  agent_think ─┬─ tool_calls ──→ execute_tool ──→ 回 agent_think
+               ├─ needs_human ──→ ask_human ────→ END
+               └─ 直接回复       → END
 ```
 
-## 环境变量
+**记忆闭环**（save/reduce 不在图内，回复返回后由 backend 异步执行）：
+```
+对话收尾 → save_memory（short 轻度压缩 → 追加 long）
+long ≥ 3 条 → reduce_memory（中度压缩覆盖 long）
+每天 23:00 → daily_compress（压缩今日 long → 明日初始上下文 + 生成给用户的日终总结）
+```
+
+**心理危机干预**（safety.py，AI 逻辑全在 agent 层）：
+```
+三阶段漏斗：违禁词拦截 → 关键词四维评分 → LLM 语义检测（最终定性）
+高危：快速摘要（最近 10 条对话浓缩，落 high_risk_summaries 表）+ AI 持续深度安抚（引导 12356 热线）
+中/低危：深度安抚模式提示词覆写
+```
+
+## 目录
+
+```
+agent_hina/
+  graph.py          # 主图构建（单例，进程只 build 一次）+ 异步记忆压缩入口
+  state.py          # AgentState
+  models.py         # LLM 统一封装（唯一入口）
+  prompts.py        # 全部提示词（主人设/记忆/澄清/安全 4 类）
+  safety.py         # 三阶段漏斗安全检测 + 高危快速摘要
+  tools.py          # search_web（Tavily）
+  nodes/            # think / execute / ask_human / save_memory / reduce / daily_compress / routers
+```
+
+## 环境变量（.env，与 backend 共用/复用）
 
 | 变量 | 说明 |
 |------|------|
-| `DEEPSEEK_API_KEY` | DeepSeek API |
-| `SILICONFLOW_API_KEY` | 硅基流动 Embedding |
-| `TAVILY_API_KEY` | 网页搜索 |
-| `JPUSH_APP_KEY` | 极光推送 AppKey |
-| `JPUSH_MASTER_SECRET` | 极光推送 Master Secret |
+| `DEEPSEEK_API_KEY` | DeepSeek API key（必填） |
+| `TAVILY_API_KEY` | Tavily 网页搜索 key（可选，未配置时搜索返回失败） |
+
+> 旧版说明（多层性格 / ChromaDB / 自主闹钟 / 每日日记 / 极光 / Android）对应已废弃功能，见 `_deprecated/`，不要恢复。

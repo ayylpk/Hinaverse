@@ -42,8 +42,8 @@ async def _get_graph() -> CompiledStateGraph:
 async def generate_reply(
     user_message: str,
     user_profile: dict[str, Any],
-    history: list[dict[str, Any]],
     needs_deep_comfort: bool = False,
+    high_risk: bool = False,
     user_id: int | None = None,
 ) -> str:
     """
@@ -52,6 +52,8 @@ async def generate_reply(
     - thread_id = user_id：每个用户独立上下文与记忆（多用户隔离）
     - 回复直接返回给调用方；记忆压缩在后台异步执行，不阻塞回复
     - needs_deep_comfort：中/低危时 True，触发 agent 侧深度安抚提示词覆写
+    - high_risk：高危时 True，叠加高危持续深度安抚（引导热线，AI 继续陪伴）
+    - 历史上下文由 LangGraph checkpoint 按 thread_id 自动累积，无需调用方传入
     """
     if user_id is None:
         # 兜底：没传 user_id 时用固定线程（仅开发/单用户场景）
@@ -62,10 +64,12 @@ async def generate_reply(
     graph = await _get_graph()
     config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
 
-    # ── 组初始状态：用户消息 + 深度安抚标记 ──
+    # ── 组初始状态：用户消息 + 深度安抚/高危标记 ──
     initial: dict[str, Any] = {"messages": [HumanMessage(content=user_message)]}
     if needs_deep_comfort:
         initial["needs_deep_comfort"] = True
+    if high_risk:
+        initial["high_risk"] = True
 
     # ── 1. 先拿回复（图主链路只做回复，不含压缩）──
     result = await graph.ainvoke(initial, config=config)

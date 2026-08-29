@@ -110,26 +110,32 @@ def agent_think_node(state: AgentState) -> dict:
             short_mem.append({"role": "user", "content": latest_text})
 
     # ── 用户档案/画像（当前为空，未来由画像系统（AgentMemory）经接口注入）──
-    relationship_context = state.get("_portrait", "") or ""
-
+    relationship_context = ""
 
     system_text = prompts.SYSTEM_PROMPT.format(
         time=now.strftime("%Y年%m月%d日 %H:%M"),
         relationship_context=relationship_context or "（暂无用户档案）",
     )
 
-    # ── 深度安抚模式：中/低危安全命中时，用 SAFETY_COMFORT_LOW_PROMPT 覆写系统提示词末尾 ──
+    # ── 深度安抚模式：中/低危命中时用 SAFETY_COMFORT_LOW_PROMPT 覆写系统提示词末尾；
+    #    高危命中时用 SAFETY_COMFORT_HIGH_LONG_PROMPT（持续陪伴 + 引导热线）──
     if state.get("needs_deep_comfort"):
         # 从完整对话历史取最近 5 条（含日奈回复），让安抚模式有上下文可依
         recent_ctx = "\n".join(
             f"{'用户' if isinstance(m, HumanMessage) else '日奈'}: {getattr(m, 'content', '')}"
             for m in all_msgs[-5:]
         )
-        comfort_prompt = prompts.build_safety_comfort_low_prompt(
-            user_message=latest_text, recent_context=recent_ctx
-        )
+        if state.get("high_risk"):
+            comfort_prompt = prompts.build_safety_comfort_high_long_prompt(
+                user_message=latest_text, recent_context=recent_ctx
+            )
+            print("  [agent_think] 高危持续深度安抚模式已开启")
+        else:
+            comfort_prompt = prompts.build_safety_comfort_low_prompt(
+                user_message=latest_text, recent_context=recent_ctx
+            )
+            print("  [agent_think] 深度安抚模式已开启")
         system_text += "\n\n" + comfort_prompt
-        print("  [agent_think] 深度安抚模式已开启")
 
     # ── 滑动窗口 ──
     all_msgs = state["messages"]

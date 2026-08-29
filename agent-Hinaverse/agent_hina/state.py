@@ -27,3 +27,4 @@ class AgentState(TypedDict):
     tool_results: list                          # 本轮工具调用结果列表
     _daily_summary_text: str                    # 日终压缩产出的「给用户的日终陪伴总结」（backend 取走落库/推送）
     needs_deep_comfort: bool                    # 中/低危命中时由 backend 传入，触发深度安抚模式
+    high_risk: bool                             # 高危命中时由 backend 传入，触发高危持续深度安抚（引导热线）

@@ -8,12 +8,12 @@ import bcrypt
 import jwt
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.config import ACCESS_TOKEN_EXPIRE_MINUTES, JWT_ALGORITHM, SECRET_KEY
 from app.database import get_db
 from app.models import User
+from app.repositories import user_repo
 
 # Bearer 鉴权方案；auto_error=False 时不自动抛 401，由我们自定义处理
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -51,17 +51,16 @@ def decode_token(token: str) -> dict[str, Any]:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="无效的登录凭证")
 
 
-async def get_current_user(
+def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: Session = Depends(get_db),
 ) -> User:
-    """从 Authorization: Bearer <token> 取当前用户，失败 401"""
+    """从 Authorization: Bearer <token> 取当前用户，失败 401（同步，FastAPI 线程池执行）"""
     if credentials is None or not credentials.credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未登录")
     payload = decode_token(credentials.credentials)
     user_id = int(payload["sub"])
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    user = user_repo.get_by_id(db, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在")
     return user

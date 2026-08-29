@@ -10,6 +10,10 @@ safety.py —— 心理危机干预安全检测（agent 层 AI 能力）
 兜底：LLM 超时/异常 → 有风险信号按「高危」（宁可误报不可漏报），
       无风险信号按「安全」（避免误拦正常消息）。
 
+高危确认后的处理（生成_high_risk_summary / 深度安抚由 think.py 钩子完成）：
+    - generate_high_risk_summary：快速浓缩最近对话 → 落库（high_risk_summaries 表）
+    - AI 继续陪伴：needs_deep_comfort + high_risk 标记 → SAFETY_COMFORT_HIGH_LONG_PROMPT
+
 模型统一走 agent_hina.models（safety_model），不自行发 HTTP 请求。
 调用方：backend-Hinaverse 的 app/services/safety_service.py（转发薄壳）
         与 app/ws/ws.py（直接使用）。
@@ -50,10 +54,10 @@ class SafetyResult:
 # 第一阶段：违禁词表（命中即拦截）
 # ═══════════════════════════════════════════════════════════════════
 
-# 色情低俗
-
-
-FORBIDDEN_WORDS = [] #;_FORBIDDEN_PORN + _FORBIDDEN_VIOLENCE + _FORBIDDEN_POLITICAL
+# 色情低俗 / 暴力 / 政治敏感词库
+# ⚠️ 当前为空：词库待上线前由人工补充（避免开发期误判拦截正常消息）。
+#    补充格式：["词1", "词2", ...]，命中任一即 blocked=True 直接拦截。
+FORBIDDEN_WORDS = []
 
 
 def _check_forbidden(message: str) -> str | None:
@@ -354,50 +358,23 @@ async def check_message(
 
 
 # ═══════════════════════════════════════════════════════════════════
-# 高危过渡话术 & 危机摘要（转人工时调用）
+# 高危快速摘要（确认高危后落库用）
 # ═══════════════════════════════════════════════════════════════════
 
-# 高危过渡话术的固定兜底（LLM 不可用时使用，确保高危用户立刻得到回应）
-_HIGH_RISK_FALLBACK = (
-    "我听到你现在很痛苦，你不是一个人，我在这里陪你。"
-    "我已经为你接入专业心理专员，正在加急处理，请稍等。"
-    "如果你愿意，也可以现在拨打全国心理援助热线 12356，那边随时有人听你说。"
-)
-
-
-async def generate_high_risk_reply(user_message: str) -> str:
+async def generate_high_risk_summary(dialog_text: str) -> str:
     """
-    高危过渡话术：用 build_safety_comfort_high_prompt 生成，
-    LLM 失败时用固定兜底（高危场景必须秒回，不能依赖 LLM）。
+    高危确认后快速生成摘要（最近对话浓缩为一段文本，落库用）。
+
+    性能优先：短超时（10s）+ LLM 失败用原文截断兜底，绝不阻塞高危响应。
+    返回摘要文本（空字符串表示彻底失败，调用方可跳过落库）。
     """
-    prompt = prompts.build_safety_comfort_high_prompt(user_message)
+    prompt = prompts.build_safety_quick_summary_prompt(dialog_text)
     try:
-        reply = await asyncio.wait_for(_call_llm(prompt), timeout=_LLM_TIMEOUT)
-        reply = (reply or "").strip()
-        if reply:
-            return reply
+        raw = await asyncio.wait_for(_call_llm(prompt), timeout=10.0)
+        raw = (raw or "").strip()
+        if raw:
+            return raw[:500]
     except Exception:
         pass
-    return _HIGH_RISK_FALLBACK
-
-
-async def generate_crisis_summary(
-    trigger_reason: str,
-    recent_messages: str,
-    llm_comfort_log: str = "",
-) -> dict | None:
-    """
-    转人工时自动生成危机摘要（build_safety_summary_prompt）。
-    LLM 失败返回 None（不阻塞人工接管流程）。
-    """
-    prompt = prompts.build_safety_summary_prompt(
-        trigger_reason=trigger_reason,
-        recent_messages=recent_messages,
-        llm_comfort_log=llm_comfort_log,
-    )
-    try:
-        raw = await asyncio.wait_for(_call_llm(prompt), timeout=_LLM_TIMEOUT)
-        parsed = _parse_safety_json(raw)
-        return parsed or None
-    except Exception:
-        return None
+    # 兜底：直接截断最近对话原文（保证有内容可落库）
+    return (dialog_text or "")[:200]
