@@ -24,6 +24,7 @@ from sqlalchemy import select
 from app.database import SyncSessionLocal
 from app.models import Conversation, CrisisEvent, Message, User
 from app.security import decode_token
+from app.services.agent_memory import echo_async
 from app.ws.Hub import inbound_hub, outbound_hub
 from app.ws.services.agent_service import generate_reply
 from app.ws.services.safety_service import (
@@ -161,6 +162,9 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         db.commit()
         db.refresh(user_msg)
 
+        # 1.5 记忆管线回显（后台异步，不阻塞回复；role 分清是谁说的话）
+        echo_async(user.id, "user", content)
+
         # 2. 取最近历史上下文（供安全检测 + agent 复用）
         hist = db.execute(
             select(Message)
@@ -207,6 +211,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
             conv.last_message = transition
             db.commit()
             db.refresh(hina_msg)
+            # 高危转人工话术也是日奈说的话，同样进记忆管线（后台异步）
+            echo_async(user.id, "ai", transition)
             await outbound_hub.send_message(user.id, conv.id, {
                 "id": hina_msg.id,
                 "role": hina_msg.role,
@@ -243,6 +249,9 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         conv.last_message = reply
         db.commit()
         db.refresh(hina_msg)
+
+        # 6.5 记忆管线回显（后台异步）：日奈的回复是 ai 角色
+        echo_async(user.id, "ai", reply)
 
         # 7. 推送给前端
         await outbound_hub.send_message(user.id, conv.id, {

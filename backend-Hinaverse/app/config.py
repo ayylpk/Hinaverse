@@ -40,3 +40,16 @@ if not os.getenv("DEEPSEEK_API_KEY") and _AGENT_ENV.exists():
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+
+# ── AgentMemory 记忆服务（外部，X-Project 租户隔离）──
+# 两个业务接口：
+#   POST /api/echo      推消息进记忆管线（L0→L1→L3 异步消化）
+#   GET  /api/portrait?userId=  查用户画像
+# 请求头：X-Project（表前缀隔离）+ X-Api-Key（项目专属密钥）。
+# Key 属于服务端配置，绝不下发到浏览器（前端只跟本后端说话）。
+# 开发期指向本机 AgentMemory（bun run index.ts 默认端口 3001）；生产改为服务器地址
+AGENT_MEMORY_BASE_URL = os.getenv("AGENT_MEMORY_BASE_URL", "http://localhost:3001")
+AGENT_MEMORY_PROJECT = os.getenv("AGENT_MEMORY_PROJECT", "Hinaverse")
+AGENT_MEMORY_API_KEY = os.getenv(
+    "AGENT_MEMORY_API_KEY", "5223f238de4486503cee8b95a8e2e37318af28d17f33cc859139ceb7eef3fd0e"
+)
