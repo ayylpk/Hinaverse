@@ -1,34 +1,69 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { ApiError } from '@/api/http'
 import hinaMoon from '@/assets/img/hina-moon.png'
 
 const router = useRouter()
 const auth = useAuthStore()
 
+/** 当前模式：登录 or 注册（同一张卡，两套文案 + 多一个确认密码框） */
+const mode = ref<'login' | 'register'>('login')
+const isRegister = computed(() => mode.value === 'register')
+
 const form = ref({
   username: '',
   password: '',
+  confirm: '',
 })
 const loading = ref(false)
 
 /** 图片加载失败时兜底：换成 CSS 月亮（图没生成好也能看） */
 const imgOk = ref(true)
 
-async function onLogin() {
+async function onSubmit() {
   if (loading.value) return
-  loading.value = true
-  await new Promise((r) => setTimeout(r, 400)) // 模拟网络延迟
-  const ok = auth.login(form.value.username, form.value.password)
-  loading.value = false
-  if (ok) {
-    ElMessage.success('欢迎回来，日奈已经在等你了')
-    router.push({ name: 'Home' })
-  } else {
-    ElMessage.error('账号或密码不正确')
+
+  // —— 前端先校验（规则与后端 RegisterRequest 一致，错了根本不发请求）——
+  if (form.value.username.trim().length < 3) {
+    ElMessage.error('账号至少需要 3 个字符')
+    return
   }
+  if (form.value.password.length < 6) {
+    ElMessage.error('密码至少需要 6 位')
+    return
+  }
+  if (isRegister.value && form.value.password !== form.value.confirm) {
+    ElMessage.error('两次输入的密码不一致')
+    return
+  }
+
+  try {
+    loading.value = true
+    if (isRegister.value) {
+      // 注册成功直接拿到 token+user，等于注册即登录，免二次跳转
+      await auth.register(form.value.username.trim(), form.value.password)
+      ElMessage.success('欢迎来到日奈宇宙，你的第一颗星已点亮')
+    } else {
+      await auth.login(form.value.username.trim(), form.value.password)
+      ElMessage.success('欢迎回来，日奈已经在等你了')
+    }
+    router.push({ name: 'Home' })
+  } catch (e) {
+    // 后端 400/401 的 detail（用户名已被使用 / 账号或密码不正确）直接给用户看
+    ElMessage.error(e instanceof ApiError ? e.detail : '网络开小差了，请稍后再试')
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 登录 ⇄ 注册 切换：清掉确认密码，避免残留输入混淆 */
+function switchMode() {
+  mode.value = isRegister.value ? 'login' : 'register'
+  form.value.confirm = ''
 }
 </script>
 
@@ -90,10 +125,12 @@ async function onLogin() {
       <!-- 右：登录卡（宇宙站的舷窗） -->
       <section class="card-col">
         <div class="login-card">
-          <h2 class="title">进入宇宙站</h2>
-          <p class="subtitle">欢迎回来，今天也辛苦了</p>
+          <h2 class="title">{{ isRegister ? '点亮第一颗星' : '进入宇宙站' }}</h2>
+          <p class="subtitle">
+            {{ isRegister ? '注册即成为夜航者，日奈会记住你的星星' : '欢迎回来，今天也辛苦了' }}
+          </p>
 
-          <el-form @submit.prevent="onLogin" class="form">
+          <el-form @submit.prevent="onSubmit" class="form">
             <el-form-item>
               <el-input
                 v-model="form.username"
@@ -114,7 +151,23 @@ async function onLogin() {
                 placeholder="密码"
                 size="large"
                 show-password
-                @keyup.enter="onLogin"
+                @keyup.enter="onSubmit"
+              >
+                <template #prefix>
+                  <el-icon><Lock /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+
+            <!-- 注册模式才有：确认密码 -->
+            <el-form-item v-if="isRegister">
+              <el-input
+                v-model="form.confirm"
+                type="password"
+                placeholder="再输一次密码"
+                size="large"
+                show-password
+                @keyup.enter="onSubmit"
               >
                 <template #prefix>
                   <el-icon><Lock /></el-icon>
@@ -127,14 +180,22 @@ async function onLogin() {
               size="large"
               class="login-btn"
               :loading="loading"
-              @click="onLogin"
+              @click="onSubmit"
             >
-              进入夜晚 <span class="arrow">→</span>
+              {{ isRegister ? '点亮星辰' : '进入夜晚' }} <span class="arrow">→</span>
             </el-button>
           </el-form>
 
           <p class="footer-line">
-            <span class="twinkle">✦</span> 你说出的每句话，都会点亮一颗星
+            <span class="twinkle">✦</span>
+            <template v-if="isRegister">
+              已有账号？
+              <a class="switch-link" @click.prevent="switchMode">返回登录</a>
+            </template>
+            <template v-else>
+              还没有账号？
+              <a class="switch-link" @click.prevent="switchMode">点亮一颗星</a>
+            </template>
           </p>
         </div>
       </section>
@@ -368,6 +429,16 @@ async function onLogin() {
 .footer-line .twinkle {
   color: var(--nv-amber);
   margin-right: 6px;
+}
+.switch-link {
+  color: var(--nv-amber);
+  cursor: pointer;
+  text-decoration: none;
+  border-bottom: 1px dashed var(--nv-amber);
+  transition: color 0.2s;
+}
+.switch-link:hover {
+  color: var(--nv-text);
 }
 
 /* ---------------- 图片兜底：CSS 月亮 ---------------- */

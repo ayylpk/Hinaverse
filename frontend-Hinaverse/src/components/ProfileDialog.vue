@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { ApiError } from '@/api/http'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
@@ -44,13 +45,9 @@ function onAvatarChange(file: File) {
 async function onSave() {
   if (saving.value) return
 
-  // 若填写了密码相关字段，则做校验
+  // 若填写了密码相关字段，则做前端格式校验（当前密码是否正确交给后端判）
   const hasPwdInput = currentPwd.value || newPwd.value || confirmPwd.value
   if (hasPwdInput) {
-    if (currentPwd.value !== '123456') {
-      ElMessage.error('当前密码不正确')
-      return
-    }
     if (!newPwd.value || newPwd.value.length < 6) {
       ElMessage.error('新密码至少 6 位')
       return
@@ -67,11 +64,23 @@ async function onSave() {
   }
 
   saving.value = true
-  await new Promise((r) => setTimeout(r, 400))
-  auth.updateProfile({ nickname: nickname.value.trim(), avatar: avatar.value })
-  saving.value = false
-  ElMessage.success('保存成功')
-  close()
+  try {
+    await auth.updateProfile({
+      nickname: nickname.value.trim(),
+      avatar: avatar.value,
+      // 填了密码才带这两个字段，后端验 current_password；没填就只改资料
+      ...(hasPwdInput
+        ? { current_password: currentPwd.value, new_password: newPwd.value }
+        : {}),
+    })
+    ElMessage.success('保存成功')
+    close()
+  } catch (e) {
+    // 当前密码错、昵称过长等后端 detail 直接展示
+    ElMessage.error(e instanceof ApiError ? e.detail : '保存失败，请稍后再试')
+  } finally {
+    saving.value = false
+  }
 }
 </script>
 

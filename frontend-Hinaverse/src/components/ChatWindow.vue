@@ -3,24 +3,13 @@ import { ref, nextTick, watch } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import hinaAvatar from '@/assets/img/hina-avatar.png'
 
+// 消息收发全在 chat store 里（WS 长连接 + 乐观上屏），这里只管输入框和滚动
 const chat = useChatStore()
 const input = ref('')
 const listRef = ref<HTMLElement | null>(null)
 
 /** 头像图片加载失败时兜底：换成 CSS 小月亮 */
 const imgOk = ref(true)
-
-// 一组更像人说话的 mock 回复
-const mockReplies = [
-  '嗯，我在听。慢慢说，不着急。',
-  '听起来你今天不太好受。要不要先深呼吸一下？',
-  '我懂这种感觉。不用急着证明什么，你已经很努力了。',
-  '你愿意说出来，就已经很好了。我都在。',
-  '嗯……换作是我，可能也会这样想。',
-  '你不需要把一切都处理得很好。累了就歇一歇，我陪着你。',
-  '夜越深，星星越亮。你现在说的话，正在变成你自己的星座。',
-  '谢谢你愿意告诉我这些。我会把它收进夜空里，好好记住。',
-]
 
 function scrollToBottom() {
   nextTick(() => {
@@ -38,15 +27,9 @@ watch(
 async function onSend() {
   const text = input.value
   if (!text.trim() || chat.sending) return
-  chat.sendUserMessage(text)
   input.value = ''
-  chat.setSending(true)
-
-  // 模拟日奈 "正在输入" 的延迟
-  await new Promise((r) => setTimeout(r, 700 + Math.random() * 600))
-  const reply = mockReplies[Math.floor(Math.random() * mockReplies.length)]
-  chat.appendHinaReply(reply)
-  chat.setSending(false)
+  // 发送：user 消息先本地上屏，等后端回 typing/message
+  await chat.sendMessage(text)
 }
 
 function onKeydown(e: KeyboardEvent) {
@@ -81,8 +64,15 @@ function onKeydown(e: KeyboardEvent) {
       <div class="header-text">
         <div class="name">日奈 <span class="name-en">Hina</span></div>
         <div class="status">
-          <span class="online-dot"></span>
-          <span>正在陪伴你</span>
+          <!-- 连接状态：正常是琥珀光，断线重连变星尘紫闪烁 -->
+          <span class="online-dot" :class="chat.wsStatus"></span>
+          <span>{{
+            chat.wsStatus === 'reconnecting'
+              ? '夜风断了，正在接上…'
+              : chat.wsStatus === 'open'
+                ? '正在陪伴你'
+                : '正在连接星空…'
+          }}</span>
         </div>
       </div>
     </header>
@@ -285,6 +275,17 @@ function onKeydown(e: KeyboardEvent) {
   background: var(--nv-amber);
   box-shadow: 0 0 8px var(--nv-amber);
   animation: breathe 2.6s ease-in-out infinite;
+}
+/* 断线重连：换星尘紫 + 更急促的闪烁 */
+.online-dot.reconnecting {
+  background: var(--nv-lilac);
+  box-shadow: 0 0 8px var(--nv-lilac);
+  animation: breathe 1.1s ease-in-out infinite;
+}
+.online-dot.closed {
+  background: var(--nv-text-muted);
+  box-shadow: none;
+  animation: none;
 }
 
 /* ---------- 消息列表（星野） ---------- */

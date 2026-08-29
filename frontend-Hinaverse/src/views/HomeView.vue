@@ -1,14 +1,23 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { useChatStore } from '@/stores/chat'
 import ChatWindow from '@/components/ChatWindow.vue'
 import ProfileDialog from '@/components/ProfileDialog.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
+const chat = useChatStore()
 const profileVisible = ref(false)
+
+onMounted(async () => {
+  // 恢复最新资料（昵称/头像可能被别处改过）
+  await auth.fetchMe().catch(() => {})
+  // 取/建会话 + 拉历史 + 建立 WS 长连接（内部幂等，重复进入不重复初始化）
+  chat.ensureReady()
+})
 
 function onCommand(cmd: string) {
   if (cmd === 'profile') {
@@ -20,6 +29,7 @@ function onCommand(cmd: string) {
       type: 'warning',
     })
       .then(() => {
+        chat.reset() // 断开 WS + 清空本地会话状态，避免下个账号串数据
         auth.logout()
         router.push({ name: 'Login' })
       })
