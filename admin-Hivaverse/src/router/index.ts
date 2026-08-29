@@ -1,0 +1,57 @@
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+
+const routes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/LoginView.vue'),
+  },
+  {
+    path: '/',
+    name: 'Crisis',
+    component: () => import('@/views/CrisisView.vue'),
+  },
+  {
+    path: '/takeover',
+    name: 'Takeover',
+    component: () => import('@/views/TakeoverView.vue'),
+  },
+  { path: '/:pathMatch(.*)*', redirect: '/' },
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+})
+
+/**
+ * 路由守卫：
+ * - 未登录（无 token）→ 登录页
+ * - 已登录但角色不是 admin（本地存的是普通用户）→ 清凭证回登录页
+ * - 登录页且已有 admin 凭证 → 直达列表
+ */
+router.beforeEach((to) => {
+  const token = localStorage.getItem('hina_token')
+  const userRaw = localStorage.getItem('hina_user')
+  let role = ''
+  try {
+    role = userRaw ? (JSON.parse(userRaw) as { role?: string }).role ?? '' : ''
+  } catch {
+    /* 本地缓存损坏按未登录处理 */
+  }
+
+  if (to.name !== 'Login' && !token) {
+    return { name: 'Login' }
+  }
+  // 有 token 但非 admin：本地凭证不可用，清掉回登录页（真正的 403 由后端兜底）
+  if (to.name !== 'Login' && token && role !== 'admin') {
+    localStorage.removeItem('hina_token')
+    localStorage.removeItem('hina_user')
+    return { name: 'Login' }
+  }
+  if (to.name === 'Login' && token && role === 'admin') {
+    return { name: 'Crisis' }
+  }
+})
+
+export default router

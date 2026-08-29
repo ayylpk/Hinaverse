@@ -26,6 +26,7 @@ class UserOut(BaseModel):
     username: str
     nickname: str
     avatar: str = ""
+    role: str = "user"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -97,20 +98,38 @@ class CrisisEventOut(BaseModel):
     risk_level: str
     trigger: str = ""
     signal: str = ""
+    # 状态：pending_human（待人工）/ comforting（LLM 安抚中）/ handling（人工处理中）/ resolved（已处理）
     status: str = "pending_human"
     summary: dict | None = None
     intervention_result: str = ""
     comfort_log: str = ""
     created_at: datetime
     resolved_at: datetime | None = None
+    # 关联用户昵称（运营端列表展示用，由路由层从 user 关系填充）
+    user_nickname: str = ""
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CrisisEventDetailOut(CrisisEventOut):
+    """事件详情：危机事件 + 关联会话最近对话（人工介入回溯上下文）"""
+    messages: list[MessageOut] = []
 
 
 class CrisisInterventionRequest(BaseModel):
     """人工标记干预结果"""
     intervention_result: str = Field(..., min_length=1, max_length=64)
     resolved: bool = Field(True, description="是否标记为已解决")
+
+
+class CrisisReplyRequest(BaseModel):
+    """运营人工回复：以 system 角色落库并实时推送到用户端"""
+    content: str = Field(..., min_length=1, max_length=2000)
+
+
+class CrisisTakeoverRequest(BaseModel):
+    """人工接管/释放：接管置 handling（处理中），释放还原 pending_human（待人工）"""
+    takeover: bool = Field(True, description="true=接管→handling，false=释放→pending_human")
 
 
 # ═══════════════════════════════════════

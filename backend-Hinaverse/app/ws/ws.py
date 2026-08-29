@@ -163,6 +163,19 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         # 1.5 记忆管线回显（后台异步，不阻塞回复；role 分清是谁说的话）
         echo_async(user.id, "user", content)
 
+        # 1.6 人工接管中断：该会话存在 handling（人工处理中）事件 → 不走 agent 自动回复，
+        #     落一条系统提示并推送；直到人工提交干预结果（resolved）后 handling 消失才恢复
+        if any(e.conversation_id == conv.id for e in crisis_repo.list_by_status(db, user.id, "handling")):
+            tip = message_repo.insert_one(db, conv.id, "system", "人工客服已接管对话，请稍候，会由人工回复你。")
+            conversation_repo.update_last_message(db, conv, tip.content)
+            await outbound_hub.send_message(user.id, conv.id, {
+                "id": tip.id,
+                "role": tip.role,
+                "content": tip.content,
+                "time": tip.time,
+            })
+            return
+
         # 2. 取最近历史上下文（供安全检测 + agent 复用）
         history = [
             {"role": m.role, "content": m.content}

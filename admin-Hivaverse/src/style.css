@@ -1,0 +1,293 @@
+/* ============================================================
+ * 日奈宇宙 · 运营台 —— 设计系统（沿用用户端夜航配色）
+ * 深靛蓝夜空 + 琥珀月光 + 星尘紫，Element Plus 深色玻璃风
+ * ============================================================ */
+
+:root {
+  --nv-bg: #0f1222;
+  --nv-bg-2: #12162a;
+  --nv-glow: #1c2340;
+  --nv-surface: rgba(23, 29, 54, 0.72);
+  --nv-surface-strong: rgba(26, 33, 61, 0.92);
+  --nv-border: rgba(255, 255, 255, 0.09);
+  --nv-border-strong: rgba(255, 255, 255, 0.16);
+
+  --nv-amber: #f2b04c;
+  --nv-amber-deep: #e08f3d;
+  --nv-amber-ink: #241704;
+  --nv-amber-soft: rgba(242, 176, 76, 0.13);
+  --nv-amber-glow: rgba(242, 176, 76, 0.28);
+
+  --nv-lilac: #b9a5e0;
+  --nv-lilac-soft: rgba(185, 165, 224, 0.14);
+
+  --nv-text: #f3efe6;
+  --nv-text-soft: #a9b0c6;
+  --nv-text-muted: #6e7693;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+
+  --shadow-sm: 0 1px 2px rgba(6, 8, 18, 0.4);
+  --shadow-md: 0 12px 32px rgba(6, 8, 18, 0.45);
+  --shadow-lg: 0 24px 64px rgba(6, 8, 18, 0.55);
+  --glow-amber: 0 0 24px rgba(242, 176, 76, 0.28);
+
+  --font-display: 'LXGW WenKai', 'Kaiti', 'STKaiti', 'KaiTi', serif;
+  --font-body: 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system,
+    'Segoe UI', Roboto, sans-serif;
+
+  font-family: var(--font-body);
+  line-height: 1.6;
+  color: var(--nv-text);
+  background: var(--nv-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: radial-gradient(
+      1100px 600px at 85% 12%,
+      rgba(58, 72, 130, 0.22),
+      transparent 62%
+    ),
+    linear-gradient(180deg, var(--nv-bg-2) 0%, var(--nv-bg) 100%);
+  background-attachment: fixed;
+}
+
+a {
+  color: var(--nv-amber);
+  text-decoration: none;
+}
+
+/* ---- 星野底纹 ---- */
+.starfield {
+  position: relative;
+}
+.starfield::before,
+.starfield::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.starfield::before {
+  background-image: radial-gradient(
+      1px 1px at 12% 22%,
+      rgba(243, 239, 230, 0.55),
+      transparent 100%
+    ),
+    radial-gradient(1px 1px at 38% 8%, rgba(243, 239, 230, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 63% 17%, rgba(185, 165, 224, 0.5), transparent 100%),
+    radial-gradient(1px 1px at 82% 32%, rgba(243, 239, 230, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 92% 9%, rgba(185, 165, 224, 0.45), transparent 100%),
+    radial-gradient(1px 1px at 27% 52%, rgba(243, 239, 230, 0.3), transparent 100%),
+    radial-gradient(1px 1px at 55% 71%, rgba(185, 165, 224, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 77% 63%, rgba(243, 239, 230, 0.28), transparent 100%);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+.starfield::after {
+  background-image: radial-gradient(
+      1px 1px at 22% 66%,
+      rgba(185, 165, 224, 0.42),
+      transparent 100%
+    ),
+    radial-gradient(1px 1px at 48% 38%, rgba(243, 239, 230, 0.32), transparent 100%),
+    radial-gradient(1px 1px at 68% 86%, rgba(243, 239, 230, 0.4), transparent 100%),
+    radial-gradient(1px 1px at 88% 52%, rgba(185, 165, 224, 0.35), transparent 100%),
+    radial-gradient(1px 1px at 7% 83%, rgba(243, 239, 230, 0.3), transparent 100%);
+  background-size: 310px 310px;
+  background-repeat: repeat;
+}
+
+/* ---- 滚动条 ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(242, 176, 76, 0.22);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(242, 176, 76, 0.4);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+ * Element Plus 主题覆盖 —— 夜航配色
+ * ============================================================ */
+:root {
+  --el-color-primary: #f2b04c;
+  --el-color-primary-light-3: #ffc87a;
+  --el-color-primary-light-5: rgba(242, 176, 76, 0.4);
+  --el-color-primary-light-7: rgba(242, 176, 76, 0.2);
+  --el-color-primary-light-8: rgba(242, 176, 76, 0.12);
+  --el-color-primary-light-9: rgba(242, 176, 76, 0.08);
+  --el-color-primary-dark-2: #e08f3d;
+
+  --el-bg-color: #171d36;
+  --el-bg-color-overlay: #1c2340;
+  --el-text-color-primary: #f3efe6;
+  --el-text-color-regular: #c9cee2;
+  --el-text-color-secondary: #a9b0c6;
+  --el-text-color-placeholder: #6e7693;
+
+  --el-border-color: rgba(255, 255, 255, 0.14);
+  --el-border-color-light: rgba(255, 255, 255, 0.1);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.07);
+
+  --el-fill-color-blank: transparent;
+  --el-fill-color-light: rgba(255, 255, 255, 0.05);
+  --el-fill-color: rgba(255, 255, 255, 0.08);
+
+  --el-mask-color: rgba(8, 10, 22, 0.7);
+  --el-border-radius-base: var(--radius-sm);
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--nv-amber);
+  --el-button-border-color: transparent;
+  --el-button-text-color: var(--nv-amber-ink);
+  --el-button-hover-bg-color: #ffc87a;
+  --el-button-hover-border-color: transparent;
+  --el-button-hover-text-color: var(--nv-amber-ink);
+  --el-button-active-bg-color: var(--nv-amber-deep);
+  --el-button-active-border-color: transparent;
+  --el-button-active-text-color: #fff;
+  font-weight: 600;
+  box-shadow: var(--glow-amber);
+}
+.el-button--primary.is-disabled {
+  opacity: 0.45 !important;
+}
+
+.el-button {
+  --el-button-bg-color: transparent;
+  --el-button-border-color: var(--nv-border-strong);
+  --el-button-text-color: var(--nv-text-soft);
+  --el-button-hover-bg-color: rgba(255, 255, 255, 0.06);
+  --el-button-hover-border-color: var(--nv-amber);
+  --el-button-hover-text-color: var(--nv-amber);
+}
+
+.el-input__wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--nv-border);
+  box-shadow: none !important;
+  border-radius: var(--radius-sm) !important;
+  transition: border-color 0.2s, background 0.2s;
+}
+.el-input__wrapper.is-focus {
+  border-color: var(--nv-amber);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 0 3px rgba(242, 176, 76, 0.12) !important;
+}
+
+.el-select__wrapper {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: none !important;
+}
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--nv-amber) inset !important;
+}
+
+.el-popper.is-light,
+.el-select__popper.el-popper {
+  background: var(--el-bg-color-overlay) !important;
+  border-color: var(--nv-border) !important;
+}
+.el-select-dropdown__item {
+  color: var(--nv-text-soft);
+}
+.el-select-dropdown__item.is-hovering {
+  background: var(--nv-amber-soft) !important;
+  color: var(--nv-amber) !important;
+}
+.el-select-dropdown__item.is-selected {
+  color: var(--nv-amber) !important;
+}
+
+/* 表格：玻璃面板 */
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.04);
+  --el-table-header-text-color: var(--nv-text-soft);
+  --el-table-text-color: var(--nv-text);
+  --el-table-border-color: var(--nv-border);
+  --el-table-row-hover-bg-color: rgba(242, 176, 76, 0.07);
+  background: transparent;
+}
+.el-table th.el-table__cell {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+.el-table .el-table__inner-wrapper::before {
+  background-color: var(--nv-border);
+}
+
+/* 抽屉 */
+.el-drawer {
+  background: var(--el-bg-color-overlay);
+  border-left: 1px solid var(--nv-border);
+}
+.el-drawer__header {
+  color: var(--nv-text);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+/* 标签 */
+.el-tag {
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+}
+
+/* 消息提示 */
+.el-message {
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(10px);
+}
+
+/* 空态文字 */
+.el-table__empty-text,
+.el-empty__description {
+  color: var(--nv-text-muted);
+}
+
+/* 分页/描述列表适配暗色 */
+.el-descriptions__label {
+  color: var(--nv-text-muted);
+}
+.el-descriptions__content {
+  color: var(--nv-text);
+}
+.el-descriptions__body {
+  background: transparent;
+}
+.el-descriptions__body .el-descriptions__table {
+  background: transparent;
+}

@@ -45,6 +45,11 @@ def create_with_opening(db: Session, user_id: int) -> Conversation:
     return conv
 
 
+def get_by_id(db: Session, conversation_id: int) -> Conversation | None:
+    """按主键查会话（运营人工回复更新 last_message 用）"""
+    return db.get(Conversation, conversation_id)
+
+
 def get_owned(db: Session, conversation_id: int, user_id: int) -> Conversation | None:
     """取属于指定用户的会话（越权返回 None）"""
     return db.execute(

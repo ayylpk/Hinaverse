@@ -19,6 +19,8 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     nickname: Mapped[str] = mapped_column(String(64), nullable=False)
+    # 角色：user（普通用户）/ admin（运营管理员）。admin 由运维手工 SQL 置位，无注册入口
+    role: Mapped[str] = mapped_column(String(16), default="user", nullable=False)
     # 头像只存 URL，空串表示未设置（本轮不做文件上传）
     avatar: Mapped[str] = mapped_column(String(512), default="", nullable=False)
     # 极光推送设备 ID，按用户维度存储
