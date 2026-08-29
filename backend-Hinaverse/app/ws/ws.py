@@ -221,8 +221,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
             })
             return
 
-        # ── 分支 C：中/低危 → 正常 agent，但开启深度安抚 ──
-        needs_deep_comfort = safety.risk_level in ("中危")
+        # ── 分支 C：中/低危 → 正常 agent，但开启深度安抚（任务书：中/低危都送 LLM 深度安抚）──
+        needs_deep_comfort = safety.risk_level in ("中危", "低危")
         if needs_deep_comfort:
             # 落库危机事件（LLM 安抚中）
             _save_crisis_event(db, user.id, conv.id, safety, status="comforting")
