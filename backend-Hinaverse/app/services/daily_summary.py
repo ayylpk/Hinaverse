@@ -15,6 +15,7 @@ from langchain_core.messages import SystemMessage
 
 from app.database import SyncSessionLocal
 from app.repositories import diary_repo, user_repo
+from app.services.agent_memory import get_portrait_cached
 from app.ws.services.agent_service import _get_graph
 
 logger = logging.getLogger(__name__)
@@ -41,10 +42,14 @@ async def _compress_one(user_id: int) -> None:
     try:
         graph = await _get_graph()
         config = {"configurable": {"thread_id": f"user_{user_id}"}}
-        result = await graph.ainvoke(
-            {"messages": [SystemMessage(content=_DAILY_TRIGGER)]},
-            config=config,
-        )
+
+        # 画像回流：拉用户画像注入 state，日终总结据此写得更贴心（失败 None 走「暂无用户档案」兜底）
+        initial: dict = {"messages": [SystemMessage(content=_DAILY_TRIGGER)]}
+        portrait = await get_portrait_cached(user_id)
+        if portrait:
+            initial["portrait"] = portrait
+
+        result = await graph.ainvoke(initial, config=config)
         summary_text = (result.get("_daily_summary_text") or "").strip()
         if not summary_text:
             logger.info(f"[daily_summary] 用户 {user_id} 无今日内容，跳过")

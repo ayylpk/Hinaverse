@@ -27,9 +27,8 @@ from agent_hina.prompts import (
     build_daily_summary_prompt,
 )
 
-# 未来由用户画像系统（AgentMemory）经接口注入；当前为空
-def _read_relationship_context() -> str:
-    return ""
+# 用户画像：由 backend 从 AgentMemory 拉取后注入 AgentState.portrait（与 think.py 同一来源），
+# 缺省时 build_daily_summary_prompt 内部兜底为「暂无用户档案」。
 
 
 def daily_compress_node(state: AgentState) -> dict:
@@ -55,7 +54,7 @@ def daily_compress_node(state: AgentState) -> dict:
         print("  [daily_compress] long 和 short 均为空，跳过")
         return {"_daily_summary_text": ""}
 
-    relationship_context = _read_relationship_context()
+    relationship_context = state.get("portrait") or ""
 
     # ── 1. 轻度压缩今日记忆 → 明日初始上下文 ──
     daily_summary = ""

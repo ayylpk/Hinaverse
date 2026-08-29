@@ -77,6 +77,32 @@ async def get_portrait(user_id: int) -> str | None:
         return None
 
 
+# ── 画像本地缓存（TTL）：画像由 AgentMemory L3 异步消化，变化很慢（天级），
+#    不需要每轮回复都跨服务拉一次。每轮对话都同步等 get_portrait（最坏 3s 超时）
+#    会拖慢回复，所以用内存缓存：TTL 内直接用旧值，过期才同步重拉一次。
+#    失败时保留旧值继续用；彻底没有旧值才返回 None（think.py 走「暂无用户档案」兜底）。
+_PORTRAIT_CACHE: dict[int, tuple[str, float]] = {}   # user_id → (text, fetched_at)
+_PORTRAIT_TTL = 5 * 60                               # 5 分钟；画像变化慢，可接受滞后
+
+
+async def get_portrait_cached(user_id: int) -> str | None:
+    """带 TTL 缓存的画像查询：绝大多数调用瞬间返回，最坏每 TTL 一次 3s 网络等待。"""
+    import time
+    cached = _PORTRAIT_CACHE.get(user_id)
+    now = time.monotonic()
+    if cached and now - cached[1] < _PORTRAIT_TTL:
+        return cached[0] or None
+
+    fresh = await get_portrait(user_id)
+    if fresh:
+        _PORTRAIT_CACHE[user_id] = (fresh, now)
+        return fresh
+    # 拉取失败：旧值继续用（即使已过期，也比没有强）；没有旧值 → None 走兜底
+    if cached:
+        return cached[0] or None
+    return None
+
+
 def _headers() -> dict[str, str]:
     """业务鉴权头：X-Project（表前缀隔离）+ X-Api-Key（项目专属密钥）"""
     return {

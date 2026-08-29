@@ -109,8 +109,9 @@ def agent_think_node(state: AgentState) -> dict:
         if not short_mem or short_mem[-1].get("content") != latest_text:
             short_mem.append({"role": "user", "content": latest_text})
 
-    # ── 用户档案/画像（当前为空，未来由画像系统（AgentMemory）经接口注入）──
-    relationship_context = ""
+    # ── 用户画像（AgentMemory 生成，backend 每轮注入 AgentState.portrait；
+    #    缺省时提示词走「暂无用户档案」兜底）──
+    relationship_context = state.get("portrait") or ""
 
     system_text = prompts.SYSTEM_PROMPT.format(
         time=now.strftime("%Y年%m月%d日 %H:%M"),
