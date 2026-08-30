@@ -10,7 +10,7 @@ _SYSTEM_MAINTENANCE = {
 }
 
 
-def route_at_start(state: AgentState) -> Literal["agent_think", "daily_compress"]:  # type: ignore
+def route_at_start(state: AgentState) -> Literal["agent_think", "daily_compress", "wait_human"]:  # type: ignore
     """
     START 分发。
 
@@ -18,8 +18,8 @@ def route_at_start(state: AgentState) -> Literal["agent_think", "daily_compress"
       - 用户输入        → 无前缀，正常对话
       - [系统状态切换]   → 定时任务（目前只有日终压缩）
 
-    [系统状态切换] 中「日终压缩」是系统维护任务，直接走 daily_compress，
-    不经过 agent_think。
+    正常用户输入时再叠加人工接管判断：
+      - human_takeover=True（后端检测到该会话 handling）→ wait_human，agent 暂停自动回复
     """
     messages = state.get("messages", [])
 
@@ -28,7 +28,7 @@ def route_at_start(state: AgentState) -> Literal["agent_think", "daily_compress"
         if hasattr(last_msg, "content") and last_msg.content:
             content = str(last_msg.content)
 
-            # 系统状态切换 → 查维护映射表
+            # 系统状态切换 → 查维护映射表（维护任务不受人工接管影响）
             if content.startswith("[系统状态切换]"):
                 reason = content.replace("[系统状态切换]", "").strip()
                 action_word = reason.split()[0] if reason else ""
@@ -38,6 +38,11 @@ def route_at_start(state: AgentState) -> Literal["agent_think", "daily_compress"
                     return target  # type: ignore
                 print(f"  [router:start] → agent_think (状态变更: {reason})")
                 return "agent_think"
+
+    # 人工接管中 → 暂停自动回复（LangGraph interrupt）
+    if state.get("human_takeover"):
+        print("  [router:start] → wait_human (人工接管中，agent 暂停)")
+        return "wait_human"
 
     # 正常用户输入 → 直接思考
     print("  [router:start] → agent_think")

@@ -13,7 +13,10 @@ pydantic>=2.5.0
 # AI 能力统一收口在 agent-Hinaverse/agent_hina（safety.py / models.py / prompts.py / graph.py）
 # backend 只做编排，通过 import agent_hina.* 复用其模型封装与 LangGraph 图
 langchain-deepseek>=1.1.0
-langgraph>=0.2.0
+# ⚠️ 1.x 语义与 0.2.x 不同：ainvoke 遇 interrupt() 不抛异常，而是返回带 __interrupt__ 键的
+# 结果（generate_reply 靠 result.get("__interrupt__") 判断挂起）；Command(resume=...) 收尾，
+# resume 值不能是 None（1.2.11 会 UnboundLocalError）。实测 1.2.11（backend venv）与 1.2.10 一致。
+langgraph>=1.0,<2
 langgraph-checkpoint-sqlite>=2.0.0
 
 # 测试

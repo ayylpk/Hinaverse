@@ -45,6 +45,7 @@ from agent_hina.state import AgentState
 from agent_hina.nodes.think import agent_think_node
 from agent_hina.nodes.execute import execute_tool_node
 from agent_hina.nodes.ask_human import ask_human_node
+from agent_hina.nodes.wait_human import wait_human_node
 from agent_hina.nodes.daily_compress import daily_compress_node
 from agent_hina.nodes.routers import should_continue, route_at_start
 from agent_hina.nodes.reduce import COMPRESS_THRESHOLD
@@ -85,11 +86,13 @@ async def build_hina_graph():
     builder.add_node("execute_tool", execute_tool_node)
     builder.add_node("ask_human", ask_human_node)
     builder.add_node("daily_compress", daily_compress_node)
+    builder.add_node("wait_human", wait_human_node)
 
-    # ── START 分发：日终压缩（定时任务触发） / 正常对话 ──
+    # ── START 分发：日终压缩（定时任务触发） / 人工接管中断 / 正常对话 ──
     builder.add_conditional_edges(START, route_at_start, {
         "agent_think": "agent_think",
         "daily_compress": "daily_compress",
+        "wait_human": "wait_human",
     })
 
     # agent_think → 三条路由（回复优先，压缩不在图内）
@@ -104,6 +107,9 @@ async def build_hina_graph():
 
     # 人工澄清完 → 直接结束（澄清话术本身就是回复，不再回 agent_think 避免循环）
     builder.add_edge("ask_human", END)
+
+    # 人工接管中断完 → 直接结束（本轮不产生回复；resume 收尾也走这里）
+    builder.add_edge("wait_human", END)
 
     # 日终压缩完 → 结束（总结在 _daily_summary_text，由 backend 取走落库/推送）
     builder.add_edge("daily_compress", END)
