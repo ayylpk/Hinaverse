@@ -113,10 +113,20 @@ def agent_think_node(state: AgentState) -> dict:
     #    缺省时提示词走「暂无用户档案」兜底）──
     relationship_context = state.get("portrait") or ""
 
+    # ── 往日的陪伴：日终总结存档（daily_archive，每天日清时 append 当日总结，
+    #    这里注入系统提示，让日奈"记得昨天聊了什么"，次日首条消息即可自然接续）──
+    archive = state.get("daily_archive") or []
+    archive_context = ""
+    if isinstance(archive, list) and archive:
+        recent_archive = archive[-7:]  # 只带最近 7 天，防上下文过长
+        archive_context = "\n\n【往日的陪伴（每天的日终总结，可自然接续话题）】\n" + "\n".join(
+            f"- {a}" for a in recent_archive if a
+        )
+
     system_text = prompts.SYSTEM_PROMPT.format(
         time=now.strftime("%Y年%m月%d日 %H:%M"),
         relationship_context=relationship_context or "（暂无用户档案）",
-    )
+    ) + archive_context
 
     # ── 深度安抚模式：中/低危命中时用 SAFETY_COMFORT_LOW_PROMPT 覆写系统提示词末尾；
     #    高危命中时用 SAFETY_COMFORT_HIGH_LONG_PROMPT（持续陪伴 + 引导热线）──

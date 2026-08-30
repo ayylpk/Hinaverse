@@ -1,7 +1,8 @@
 """
 Pydantic 请求/响应模型。字段命名与前端协议严格对齐。
 """
-from datetime import datetime
+from datetime import date as date_type, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -161,6 +162,32 @@ class DiaryOut(BaseModel):
     id: int
     user_id: int
     content: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ═══════════════════════════════════════
+# 打卡（checkin 接口，星历模块）
+# ═══════════════════════════════════════
+
+class CheckinCreate(BaseModel):
+    """新建打卡：内容必填（1..500）；date 可选（归属日，缺省当天，允许过去/未来）"""
+    content: str = Field(..., min_length=1, max_length=500)
+    date: date_type | None = None
+
+
+class CheckinUpdate(BaseModel):
+    """打卡/取消打卡标记：仅 status 可改"""
+    status: Literal["done", "todo"]
+
+
+class CheckinOut(BaseModel):
+    id: int
+    user_id: int
+    content: str
+    date: date_type
+    status: str = "todo"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

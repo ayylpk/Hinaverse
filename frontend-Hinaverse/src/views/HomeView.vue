@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+import { Calendar, Tickets } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import ChatWindow from '@/components/ChatWindow.vue'
@@ -56,6 +57,16 @@ function onCommand(cmd: string) {
             <span class="brand-cn">日奈宇宙</span>
             <span class="brand-en">HINAVERSE</span>
           </div>
+        </div>
+
+        <div class="nav-actions">
+          <!-- 星历入口：日记 / 打卡 -->
+          <router-link class="nav-link" :to="{ name: 'Diary' }">
+            <el-icon><Tickets /></el-icon>日记
+          </router-link>
+          <router-link class="nav-link" :to="{ name: 'Checkin' }">
+            <el-icon><Calendar /></el-icon>打卡
+          </router-link>
         </div>
 
         <el-dropdown trigger="click" @command="onCommand">
@@ -193,6 +204,28 @@ function onCommand(cmd: string) {
 .user-name {
   font-size: 14px;
   color: var(--nv-text);
+}
+
+/* 星历入口 */
+.nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--nv-text-soft);
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+}
+.nav-link:hover {
+  background: var(--nv-amber-soft);
+  color: var(--nv-amber);
 }
 
 .caret {

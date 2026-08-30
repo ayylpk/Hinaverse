@@ -22,5 +22,8 @@ def wait_human_node(state: AgentState) -> dict:
         "reason": "human_takeover",
         "message": "会话已被人工接管，agent 自动回复已暂停",
     })
-    # resume 收尾时会从这里继续，直接结束本轮（不产生回复）
-    return {}
+    # resume 收尾时会从这里继续：
+    # ⚠️ 必须清掉 human_takeover 标记——该字段持久化在 checkpoint，不清的话
+    # 干预结束后的下一条消息会被路由误判成接管中（实测踩坑）。后端同一消息
+    # 会重新显式传 True/False 覆盖，这里是图侧兜底防御。
+    return {"human_takeover": False}

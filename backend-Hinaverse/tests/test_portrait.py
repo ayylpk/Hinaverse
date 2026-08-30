@@ -109,6 +109,16 @@ class _FakeGraph:
         self.received = initial
         return {"messages": [AIMessage(content="假图回复")]}
 
+    async def aget_state(self, config: dict):
+        """agent_service 的 pending interrupt 清理分支用 snap.next 判 wait_human 挂起；
+        无挂起（新 thread / 普通消息流）时 next 为空 → 清理分支跳过"""
+        return _FakeSnap()
+
+
+class _FakeSnap:
+    """aget_state 的最小返回（测试只看 snap.next）"""
+    next: tuple = ()
+
 
 async def _noop_compression(*a, **k) -> None:
     """假 run_memory_compression：必须是 async 函数（被 create_task 调用，要返回真协程）"""

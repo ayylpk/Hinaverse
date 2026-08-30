@@ -27,19 +27,31 @@ from langgraph.types import Command  # noqa: E402
 
 from app.services.agent_memory import get_portrait_cached  # noqa: E402
 
-# ── 图实例单例：进程只 build 一次，多用户并发复用 ──
-_GRAPH: CompiledStateGraph | None = None
-_GRAPH_LOCK = asyncio.Lock()
+# ── 图实例单例：按"事件循环"缓存（每个 loop 最多 build 一次，多用户并发复用） ──
+# 生产 uvicorn 单 loop ≈ 全局一份，语义与旧版完全一致；
+# 测试环境每个 TestClient 有独立 loop，图内部（AsyncSqliteSaver 等）持有 loop 绑定的
+# asyncio 原语——跨 loop 复用一个已建好的图会炸 "Lock is bound to a different event loop"
+# （实测：test_ws 两条用例连续跑时第二个 TestClient 必崩），所以必须按 loop 隔离重建。
+# 两个 dict 以 loop 对象为键（强引用，防 id 复用串台；loop 销毁后条目随引用一起回收）。
+_GRAPHS: dict[asyncio.AbstractEventLoop, CompiledStateGraph] = {}
+_GRAPH_LOCKS: dict[asyncio.AbstractEventLoop, asyncio.Lock] = {}
 
 
 async def _get_graph() -> CompiledStateGraph:
-    """懒加载 + 并发安全的图单例"""
-    global _GRAPH
-    if _GRAPH is None:
-        async with _GRAPH_LOCK:
-            if _GRAPH is None:
-                _GRAPH = await build_hina_graph()
-    return _GRAPH
+    """懒加载 + 并发安全的图单例（按当前事件循环取/建）"""
+    loop = asyncio.get_running_loop()
+    graph = _GRAPHS.get(loop)
+    if graph is None:
+        lock = _GRAPH_LOCKS.get(loop)
+        if lock is None:
+            lock = asyncio.Lock()  # 锁也按 loop 隔离：跨 loop 的锁本身就不能共用
+            _GRAPH_LOCKS[loop] = lock
+        async with lock:
+            graph = _GRAPHS.get(loop)
+            if graph is None:
+                graph = await build_hina_graph()
+                _GRAPHS[loop] = graph
+    return graph
 
 
 async def generate_reply(
@@ -77,8 +89,10 @@ async def generate_reply(
         initial["needs_deep_comfort"] = True
     if high_risk:
         initial["high_risk"] = True
-    if human_takeover:
-        initial["human_takeover"] = True
+    # ⚠️ 必须无条件传 human_takeover（True 或 False 都写）：
+    # 该字段会持久化进 checkpoint，若上次接管为 True、这次没传，残留值会让路由误进
+    # wait_human（实测踩坑：干预结束后 agent 恢复不了）。显式覆盖 checkpoint 旧值。
+    initial["human_takeover"] = human_takeover
 
     # ── 画像回流：回复前取用户画像（TTL 缓存，绝大多数调用零网络；失败返回 None 走兜底）。
     #    人工接管中断时不需要画像，跳过省一次网络 ──

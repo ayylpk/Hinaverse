@@ -8,3 +8,7 @@
 # ===== 遗留空占位文件 / 任务书（不入库）=====
 prompt.txt
 AGENT_TASK_PROMPT.md
+PROMPT_LEAVE_DAILY.md
+
+# ===== 运行日志（不入库）=====
+backend-Hinaverse/*.log

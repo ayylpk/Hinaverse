@@ -31,3 +31,5 @@ class AgentState(TypedDict):
     portrait: str                               # 用户画像（AgentMemory 生成，backend 拉取注入；缺省时提示词走「暂无用户档案」兜底）
     human_takeover: bool                        # 人工接管中：backend 传入 True，图在 wait_human 节点 interrupt 暂停自动回复，
                                                 # 直到运营提交干预结果（resolved）后 handling 消失才恢复
+    daily_archive: list                         # 日终总结存档：每天日清时 append 当日总结，次日第一条消息注入系统提示
+                                                # （持续上下文，让日奈记得"昨天聊了什么"；日清保留它）

@@ -1,14 +1,14 @@
 """
 message_repo —— 聊天记录数据访问（消息表）。
 
-涵盖：单条/批量插入、游标分页取历史、最近 N 条。
+涵盖：单条/批量插入、游标分页取历史、最近 N 条、用户最后活跃时间。
 """
 from datetime import datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Message
+from app.models import Conversation, Message
 
 
 def _now_hm() -> str:
@@ -67,6 +67,21 @@ def get_recent(db: Session, conversation_id: int, limit: int = 20) -> list[Messa
         .limit(limit)
     ).scalars().all()
     return list(reversed(rows))
+
+
+def get_latest_activity(db: Session, user_id: int) -> datetime | None:
+    """
+    该用户所有会话的最新消息时间（离开判定用）。
+
+    为什么用 messages.created_at 而不是 messages.time：
+      time 是 "HH:MM" 展示字符串，不能裸比大小；created_at 是服务端写入的
+      datetime，单调可靠。无消息时返回 None（调用方用 user.created_at 兜底）。
+    """
+    return db.execute(
+        select(func.max(Message.created_at))
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Conversation.user_id == user_id)
+    ).scalar_one_or_none()
 
 
 def list_page(

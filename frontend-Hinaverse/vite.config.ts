@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
@@ -20,6 +22,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  // 依赖优化缓存放系统临时目录：本机 WorkBuddy 的 safe-delete 会拦截
+  // node_modules/.vite 下的目录清理导致 vite 启动即崩，挪到临时目录走原生删除
+  cacheDir: join(tmpdir(), 'hinaverse-front-vite-cache'),
   // 开发代理：前端跑 517x，后端 FastAPI 跑 8000
   // 页面里写 /api/xxx、/ws 即可，Vite 负责转发（这也避开了后端 CORS 配置差异）
   server: {

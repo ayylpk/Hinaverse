@@ -1,11 +1,11 @@
 """
-ORM 模型：User / Conversation / Message / CrisisEvent。
+ORM 模型：User / Conversation / Message / CrisisEvent / Checkin。
 字段命名与前端协议对齐，方便以后直接做响应序列化。
 数据操作请走 app/repositories/（DAO 层），本文件只定义表结构。
 """
-from datetime import datetime
+from datetime import date as date_type, datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import JSON, Date, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -131,4 +131,19 @@ class HighRiskSummary(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class Checkin(Base):
+    """打卡记录：用户自建记录/打卡（todo/done 状态机，按用户隔离）。
+    星历模块：date 是打卡归属日（允许选过去/未来，缺省当天由路由层填）。"""
+    __tablename__ = "checkins"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 打卡归属日（纯日期，无时区）
+    date: Mapped[date_type] = mapped_column(Date, nullable=False)
+    # 完成标记：todo（未完成）/ done（已完成）；MySQL 原生 ENUM，sqlite 测试降级 VARCHAR+CHECK
+    status: Mapped[str] = mapped_column(Enum("todo", "done", name="checkin_status"), default="todo", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 

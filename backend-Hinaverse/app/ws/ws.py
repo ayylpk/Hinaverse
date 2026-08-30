@@ -243,6 +243,11 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         )
 
         # 6. 落库日奈消息 + 更新会话最后一条
+        #     ⚠️ 兜底：正常路径理论上不会返回 None（None 只在接管中断时出现，
+        #     且走上面 1.6 分支提前 return），但万一出现不能把 None 落库——
+        #     content 非空约束会抛 IntegrityError，直接掐断整个 WS 连接。
+        if reply is None:
+            reply = "嗯，我在听。慢慢说，不着急。"
         hina_msg = message_repo.insert_one(db, conv.id, "hina", reply)
         conversation_repo.update_last_message(db, conv, reply)
 

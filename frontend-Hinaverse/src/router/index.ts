@@ -15,6 +15,16 @@ const routes: RouteRecordRaw[] = [
     name: 'Home',
     component: () => import('@/views/HomeView.vue'),
   },
+  {
+    path: '/diary',
+    name: 'Diary',
+    component: () => import('@/views/DiaryView.vue'),
+  },
+  {
+    path: '/checkin',
+    name: 'Checkin',
+    component: () => import('@/views/CheckinView.vue'),
+  },
 ]
 
 const router = createRouter({

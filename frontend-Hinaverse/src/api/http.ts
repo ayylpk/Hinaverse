@@ -96,4 +96,8 @@ export const http = {
     request<T>(path, { method: 'POST', body: body === undefined ? undefined : JSON.stringify(body) }),
   put: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: 'PUT', body: body === undefined ? undefined : JSON.stringify(body) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
+  // 星历打卡删除用：DELETE 返回 204 空响应，request 已处理
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
 }
