@@ -8,7 +8,7 @@
  * - 提交干预结果 → 复用 POST /api/crisis/{id}/intervention → resolved 后移出接管
  * - 实时性：30s 轮询队列（静默刷新）+ 页面切回前台立即刷新
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Headset, Refresh } from '@element-plus/icons-vue'
 import AdminSidebar from '@/components/AdminSidebar.vue'
@@ -204,6 +204,17 @@ function roleLabel(role: string): string {
 
 const displayMessages = computed(() => selectedDetail.value?.messages ?? [])
 
+// ── 滚动锚定：消息区默认滚到最新一条；选中切换/新消息上屏后也贴底（不影响固定布局）──
+const chatBodyRef = ref<HTMLElement | null>(null)
+function scrollToBottom() {
+  void nextTick(() => {
+    const el = chatBodyRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
+watch(displayMessages, scrollToBottom)
+watch(selectedId, () => scrollToBottom())
+
 let pollTimer: ReturnType<typeof setInterval> | null = null
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') void loadQueue(true)
@@ -320,7 +331,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-loading="detailLoading" class="chat-body">
+            <div v-loading="detailLoading" ref="chatBodyRef" class="chat-body">
               <!-- 高危摘要 -->
               <div v-if="selectedDetail?.summary?.quick_summary" class="summary-box">
                 <span class="summary-label">高危摘要</span>
@@ -376,9 +387,11 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ---------- 布局骨架：框架固定，内容自适应（任何点击/展开不得撑开整体布局） ---------- */
 .admin-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;      /* 固定视口高度：内容是"适应框架"，不是框架适应内容 */
+  overflow: hidden;
 }
 
 /* ---------- 主内容 ---------- */
@@ -388,6 +401,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   padding: 26px 28px 32px;
+  min-height: 0;      /* 允许子级（workspace）收缩，页面头部不参与伸缩 */
 }
 
 .page-head {
@@ -521,10 +535,11 @@ onUnmounted(() => {
   margin-top: 4px;
 }
 
-/* ---------- 对话工作台 ---------- */
+/* ---------- 对话工作台（固定高度：头部/操作区固定，消息区内部滚动） ---------- */
 .col-right {
   flex: 1;
   min-width: 0;
+  min-height: 0;      /* 关键：允许 chat-body 收缩滚动，不撑开 workspace */
   display: flex;
   flex-direction: column;
   background: var(--nv-surface);
@@ -563,7 +578,7 @@ onUnmounted(() => {
 
 .chat-body {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto;   /* 消息区内部滚动，不撑开框架 */
   padding: 16px 20px;
   min-height: 0;
 }
@@ -593,20 +608,21 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
 }
+/* 消息左右规则（以 role 判定）：user → 左；hina / system → 右（人工顶替日奈原位置） */
 .chat-row {
   display: flex;
   flex-direction: column;
   gap: 3px;
   max-width: 82%;
 }
-.chat-row.from-user,
+.chat-row.from-user {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.chat-row.from-hina,
 .chat-row.from-system {
   align-self: flex-end;
   align-items: flex-end;
-}
-.chat-row.from-hina {
-  align-self: flex-start;
-  align-items: flex-start;
 }
 .chat-role {
   font-size: 11px;
@@ -623,19 +639,19 @@ onUnmounted(() => {
 .from-user .chat-bubble {
   background: linear-gradient(135deg, var(--nv-amber), var(--nv-amber-deep));
   color: var(--nv-amber-ink);
-  border-bottom-right-radius: 4px;
+  border-bottom-left-radius: 4px; /* 尾巴朝左（用户在左） */
 }
 .from-hina .chat-bubble {
   background: rgba(255, 255, 255, 0.06);
   color: var(--nv-text);
   border: 1px solid var(--nv-border);
-  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px; /* 尾巴朝右（日奈在右） */
 }
 .from-system .chat-bubble {
   background: var(--nv-lilac-soft);
   color: var(--nv-lilac);
   border: 1px solid rgba(185, 165, 224, 0.4);
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 4px; /* 人工顶替日奈，继续在右 */
 }
 .chat-time {
   font-size: 11px;

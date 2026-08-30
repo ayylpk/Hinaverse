@@ -1,14 +1,15 @@
 <script setup lang="ts">
 /**
- * 星历 · 打卡页：用户自建记录/打卡（增删改查）。
- * 后端：POST/GET/PATCH/DELETE /api/checkin（JWT，user_id 取登录用户，归属校验在后端）。
- * 交互：新建（内容 + 日期，默认今天）→ 点打勾切换 done/todo → 删除（带确认）→ 空态。
- * 排序：按日期分组（日期倒序），组内未完成(todo)在前、已完成(done)置灰在后。
+ * 星历 · 打卡页（月历星星视图）：每日一颗星，有打卡的日子淡淡亮起。
+ * 数据源：GET /api/checkin（当前用户全部打卡，接口不变）；
+ * 交互：月历切月 → 点某天的星星 → 右侧面板新建/编辑/删除当日打卡（多行输入）。
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Plus } from '@element-plus/icons-vue'
+// ⚠️ 显式 import ElMessageBox 不走 unplugin 按需样式注入，需手动带样式（否则确认框错位）
+import 'element-plus/es/components/message-box/style/css'
 import { ApiError } from '@/api/http'
 import { createCheckin, deleteCheckin, fetchCheckins, updateCheckinStatus, type Checkin } from '@/api/checkin'
 
@@ -20,9 +21,14 @@ const checkins = ref<Checkin[]>([])
 const loading = ref(true)
 const loadError = ref('')
 
-// 新建表单
+// 当前浏览的年/月（0-11）+ 选中日期
+const viewYear = ref(new Date().getFullYear())
+const viewMonth = ref(new Date().getMonth())
+const selectedDay = ref<string>(todayStr())
+
+// 新建输入（多行）
 const contentInput = ref('')
-const dateInput = ref<string>(todayStr())
+const submitting = ref(false)
 
 function todayStr(): string {
   const d = new Date()
@@ -30,26 +36,71 @@ function todayStr(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** 按日期分组（date 倒序），组内 todo 在前 done 在后 */
-const grouped = computed(() => {
+const monthLabel = computed(() => `${viewYear.value} 年 ${viewMonth.value + 1} 月`)
+
+/** 当月日历格子：null=补位，Date=当天 */
+const monthGrid = computed<(Date | null)[]>(() => {
+  const first = new Date(viewYear.value, viewMonth.value, 1)
+  const startDow = (first.getDay() + 6) % 7 // 周一开头
+  const daysInMonth = new Date(viewYear.value, viewMonth.value + 1, 0).getDate()
+  const cells: (Date | null)[] = []
+  for (let i = 0; i < startDow; i++) cells.push(null)
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(viewYear.value, viewMonth.value, d))
+  return cells
+})
+
+/** 有打卡的日期集合（星星亮起） */
+const dayKeysWithCheckin = computed<Set<string>>(() => {
+  const s = new Set<string>()
+  for (const c of checkins.value) s.add(c.date)
+  return s
+})
+
+/** 按日分组的打卡（当日面板用） */
+const checkinsByDay = computed<Map<string, Checkin[]>>(() => {
   const map = new Map<string, Checkin[]>()
   for (const c of checkins.value) {
     const list = map.get(c.date)
     if (list) list.push(c)
     else map.set(c.date, [c])
   }
-  // date 倒序（最新在前）
-  const keys = [...map.keys()].sort((a, b) => (a < b ? 1 : -1))
-  return keys.map((k) => {
-    const items = map.get(k)!
-    // 组内：todo 在前（保持 id 倒序=后建在前），done 置灰在后
-    return {
-      date: k,
-      todo: items.filter((i) => i.status === 'todo'),
-      done: items.filter((i) => i.status === 'done'),
-    }
-  })
+  return map
 })
+
+/** 选中日期的打卡：todo 在前、done 置灰在后 */
+const selectedItems = computed(() => {
+  const items = checkinsByDay.value.get(selectedDay.value) ?? []
+  return [...items.filter((i) => i.status === 'todo'), ...items.filter((i) => i.status === 'done')]
+})
+
+/** 当月是否有任何打卡（空态文案判断） */
+const hasAnyInMonth = computed(() =>
+  monthGrid.value.some((c) => c !== null && dayKeysWithCheckin.value.has(dateKey(c))),
+)
+
+const isToday = (d: Date) => dateKey(d) === todayStr()
+
+function dateKey(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function prevMonth() {
+  if (viewMonth.value === 0) {
+    viewMonth.value = 11
+    viewYear.value--
+  } else {
+    viewMonth.value--
+  }
+}
+function nextMonth() {
+  if (viewMonth.value === 11) {
+    viewMonth.value = 0
+    viewYear.value++
+  } else {
+    viewMonth.value++
+  }
+}
 
 async function load() {
   loading.value = true
@@ -64,7 +115,7 @@ async function load() {
   }
 }
 
-/** 新建：前端兜底校验（非空 + 长度上限对齐后端 500） */
+/** 新建（多行输入，前端兜底校验 1..500） */
 async function submit() {
   const content = contentInput.value.trim()
   if (!content) {
@@ -75,13 +126,17 @@ async function submit() {
     ElMessage.warning(`内容不能超过 ${MAX_CONTENT} 字`)
     return
   }
+  if (submitting.value) return
+  submitting.value = true
   try {
-    await createCheckin(content, dateInput.value || undefined)
-    ElMessage.success('打卡成功')
+    await createCheckin(content, selectedDay.value)
+    ElMessage.success('这颗星亮起来了')
     contentInput.value = ''
     await load()
   } catch (e) {
     ElMessage.error(e instanceof ApiError ? e.detail : '创建失败，请稍后再试')
+  } finally {
+    submitting.value = false
   }
 }
 
@@ -99,11 +154,11 @@ async function toggle(item: Checkin) {
 /** 删除：带确认 */
 async function remove(item: Checkin) {
   try {
-    await ElMessageBox.confirm(`确定删除这条打卡吗？\n「${item.content.slice(0, 30)}${item.content.length > 30 ? '…' : ''}」`, '删除确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    await ElMessageBox.confirm(
+      `确定删除这颗星吗？\n「${item.content.slice(0, 30)}${item.content.length > 30 ? '…' : ''}」`,
+      '删除确认',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
   } catch {
     return // 用户取消
   }
@@ -146,56 +201,93 @@ onMounted(load)
 
     <main class="main">
       <div class="checkin-shell">
-        <!-- 新建打卡 -->
-        <section class="compose glass">
-          <h2 class="section-title">记一颗星</h2>
-          <div class="compose-row">
-            <el-input
-              v-model="contentInput"
-              placeholder="写下今天想坚持或记录的事…"
-              maxlength="500"
-              show-word-limit
-              clearable
-              @keyup.enter="submit"
-            />
-            <el-date-picker
-              v-model="dateInput"
-              type="date"
-              value-format="YYYY-MM-DD"
-              placeholder="选择日期（默认今天）"
-              class="date-picker"
-            />
-            <el-button type="primary" :icon="Plus" :disabled="!contentInput.trim()" @click="submit">
-              打卡
-            </el-button>
+        <!-- 左：月历星星 -->
+        <section class="calendar-panel glass">
+          <div class="calendar-head">
+            <span class="month-label">{{ monthLabel }}</span>
+            <div class="month-nav">
+              <el-button circle size="small" text @click="prevMonth">
+                <el-icon><ArrowLeft /></el-icon>
+              </el-button>
+              <el-button circle size="small" text @click="nextMonth">
+                <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
           </div>
+
+          <div class="week-row">
+            <span v-for="w in ['一', '二', '三', '四', '五', '六', '日']" :key="w" class="week-cell">{{ w }}</span>
+          </div>
+
+          <div v-loading="loading" class="grid">
+            <div
+              v-for="(cell, i) in monthGrid"
+              :key="i"
+              class="star-cell"
+              :class="{
+                blank: cell === null,
+                has: cell !== null && dayKeysWithCheckin.has(dateKey(cell)),
+                selected: cell !== null && selectedDay === dateKey(cell),
+                today: cell !== null && isToday(cell),
+              }"
+              @click="cell !== null && (selectedDay = dateKey(cell))"
+            >
+              <template v-if="cell">
+                <svg class="star-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    class="star-fill"
+                    d="M12 2.5 L14.6 8.7 L21.3 9.2 L16.2 13.7 L17.8 20.5 L12 17 L6.2 20.5 L7.8 13.7 L2.7 9.2 L9.4 8.7 Z"
+                  />
+                </svg>
+                <span class="star-num">{{ cell.getDate() }}</span>
+              </template>
+            </div>
+          </div>
+
+          <p v-if="!hasAnyInMonth && !loading" class="month-empty">这个月还没有亮起来的星</p>
+          <p v-if="loadError" class="load-error">{{ loadError }}</p>
         </section>
 
-        <!-- 打卡列表 -->
-        <section class="list glass">
-          <h2 class="section-title">我的打卡</h2>
+        <!-- 右：当日打卡 -->
+        <section class="list-panel glass">
+          <h2 class="panel-title">
+            {{ selectedDay }}
+            <span v-if="selectedItems.length" class="count-badge">{{ selectedItems.length }} 颗</span>
+          </h2>
 
+          <!-- 新建（多行输入 + 0/500 计数） -->
+          <div class="compose">
+            <el-input
+              v-model="contentInput"
+              type="textarea"
+              :rows="3"
+              maxlength="500"
+              show-word-limit
+              resize="none"
+              placeholder="写下这一天想坚持或记录的事…"
+            />
+            <div class="compose-foot">
+              <span class="compose-tip">打在 {{ selectedDay }} 这颗星上</span>
+              <el-button
+                type="primary"
+                :icon="Plus"
+                :loading="submitting"
+                :disabled="!contentInput.trim()"
+                @click="submit"
+              >
+                打卡
+              </el-button>
+            </div>
+          </div>
+
+          <!-- 当日列表 -->
           <div v-if="loadError" class="load-error">{{ loadError }}</div>
 
-          <div v-else-if="grouped.length" v-loading="loading" class="groups">
-            <div v-for="g in grouped" :key="g.date" class="group">
-              <h3 class="group-date">{{ g.date }}</h3>
-
-              <div class="items">
-                <!-- 未完成：正常样式，排前 -->
-                <div v-for="item in g.todo" :key="item.id" class="item">
-                  <el-checkbox :model-value="false" @change="toggle(item)" />
-                  <span class="item-content">{{ item.content }}</span>
-                  <el-button size="small" text type="danger" @click="remove(item)">删除</el-button>
-                </div>
-
-                <!-- 已完成：置灰，排后 -->
-                <div v-for="item in g.done" :key="item.id" class="item done">
-                  <el-checkbox :model-value="true" @change="toggle(item)" />
-                  <span class="item-content done-text">{{ item.content }}</span>
-                  <el-button size="small" text type="danger" @click="remove(item)">删除</el-button>
-                </div>
-              </div>
+          <div v-else-if="selectedItems.length" v-loading="loading" class="items">
+            <div v-for="item in selectedItems" :key="item.id" class="item" :class="{ done: item.status === 'done' }">
+              <el-checkbox :model-value="item.status === 'done'" @change="toggle(item)" />
+              <span class="item-content" :class="{ 'done-text': item.status === 'done' }">{{ item.content }}</span>
+              <el-button size="small" text type="danger" @click="remove(item)">删除</el-button>
             </div>
           </div>
 
@@ -204,8 +296,8 @@ onMounted(load)
               <rect width="40" height="40" rx="11" fill="rgba(242,176,76,.08)" />
               <path d="M20 8a12 12 0 1 0 12 12 12 12 0 0 0-12-12zm0 4a8 8 0 1 1-8 8 8 8 0 0 1 8-8z" fill="rgba(242,176,76,.35)" />
             </svg>
-            <p>还没有打卡记录</p>
-            <span>从上面写下第一件想坚持的事开始</span>
+            <p>这一天还没有打卡</p>
+            <span>点一颗星，写下一件想坚持的小事</span>
           </div>
         </section>
       </div>
@@ -215,10 +307,11 @@ onMounted(load)
 
 <style scoped>
 .checkin-page {
-  min-height: 100vh;
+  height: 100vh; /* 固定框架：两栏内部各自滚动，内容不撑开页面 */
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden;
 }
 
 /* 玻璃导航（与 HomeView 同款） */
@@ -231,6 +324,7 @@ onMounted(load)
   position: sticky;
   top: 0;
   z-index: 10;
+  flex-shrink: 0;
 }
 .nav-inner {
   max-width: 1120px;
@@ -274,18 +368,20 @@ onMounted(load)
 
 .main {
   flex: 1;
+  min-height: 0;
   display: flex;
   justify-content: center;
-  padding: 28px 24px 40px;
+  padding: 24px 24px 28px;
   position: relative;
   z-index: 1;
 }
 .checkin-shell {
   width: 100%;
-  max-width: 720px;
+  max-width: 960px;
   display: flex;
-  flex-direction: column;
   gap: 18px;
+  align-items: flex-start;
+  min-height: 0;
 }
 
 .glass {
@@ -296,39 +392,155 @@ onMounted(load)
   padding: 20px;
 }
 
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--nv-amber);
-  letter-spacing: 1px;
-  margin: 0 0 14px;
+/* ---- 月历星星 ---- */
+.calendar-panel {
+  flex: 0 0 440px;
 }
-
-/* 新建区 */
-.compose-row {
+.calendar-head {
   display: flex;
-  gap: 10px;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
 }
-.date-picker {
-  width: 170px;
-  flex-shrink: 0;
+.month-label {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--nv-text);
+  letter-spacing: 2px;
+}
+.month-nav {
+  display: flex;
+  gap: 4px;
+}
+.week-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 6px;
+}
+.week-cell {
+  text-align: center;
+  font-size: 12px;
+  color: var(--nv-text-muted);
+  padding: 4px 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  min-height: 300px;
+}
+.star-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  border-radius: 10px;
+  transition: background 0.2s;
+}
+.star-cell.blank {
+  cursor: default;
+}
+.star-cell:not(.blank):hover {
+  background: rgba(242, 176, 76, 0.08);
+}
+.star-svg {
+  width: 88%;
+  height: 88%;
+}
+/* 无打卡：暗色描边 */
+.star-fill {
+  fill: rgba(243, 239, 230, 0.03);
+  stroke: rgba(243, 239, 230, 0.16);
+  stroke-width: 1.2;
+  transition: fill 0.25s, stroke 0.25s, filter 0.25s;
+}
+/* 有打卡：星星淡亮 + 呼吸光晕（引用全局 @keyframes breathe） */
+.star-cell.has .star-fill {
+  fill: rgba(242, 176, 76, 0.16);
+  stroke: rgba(242, 176, 76, 0.5);
+  filter: drop-shadow(0 0 6px rgba(242, 176, 76, 0.35));
+  animation: breathe 3.2s ease-in-out infinite;
+}
+.star-cell.selected .star-fill {
+  fill: rgba(242, 176, 76, 0.32);
+  stroke: var(--nv-amber);
+  filter: drop-shadow(0 0 9px rgba(242, 176, 76, 0.5));
+}
+.star-num {
+  position: absolute;
+  font-size: 12px;
+  color: var(--nv-text-soft);
+  pointer-events: none;
+}
+.star-cell.has .star-num {
+  color: var(--nv-amber);
+}
+.star-cell.today .star-num {
+  color: var(--nv-amber);
+  font-weight: 700;
+}
+.month-empty {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--nv-text-muted);
+  text-align: center;
+}
+.load-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #f87171;
+  text-align: center;
 }
 
-/* 列表 */
-.groups {
+/* ---- 当日打卡面板 ---- */
+.list-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  max-height: calc(100vh - 130px); /* 面板封顶，内部滚动，不撑开框架 */
   display: flex;
   flex-direction: column;
-  gap: 18px;
 }
-.group-date {
-  font-size: 13px;
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--nv-text-soft);
-  margin: 0 0 8px;
+  color: var(--nv-text);
   letter-spacing: 1px;
+  margin: 0 0 14px;
+  flex-shrink: 0;
 }
+.count-badge {
+  background: var(--nv-amber-soft);
+  color: var(--nv-amber);
+  border-radius: 999px;
+  font-size: 12px;
+  padding: 1px 10px;
+}
+
+.compose {
+  flex-shrink: 0;
+  margin-bottom: 14px;
+}
+.compose-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+.compose-tip {
+  font-size: 12px;
+  color: var(--nv-text-muted);
+}
+
 .items {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto; /* 当日列表内部滚动 */
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -361,20 +573,14 @@ onMounted(load)
   color: var(--nv-text-muted);
 }
 
-.load-error {
-  font-size: 13px;
-  color: #f87171;
-  text-align: center;
-  padding: 30px 0;
-}
-
 .empty-state {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 50px 20px;
+  padding: 40px 20px;
   text-align: center;
 }
 .empty-mark {

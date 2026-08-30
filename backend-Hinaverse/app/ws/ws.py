@@ -51,6 +51,9 @@ router = APIRouter()
 PING_INTERVAL = 30      # 每 30s 发一次 ping
 IDLE_TIMEOUT = 60       # 60s 无入站消息则断开
 
+# 已推送过"人工已接管"提示的 (user_id, conversation_id)：同一接管周期只提示一次
+_takeover_tip_sent: set[tuple[int, int]] = set()
+
 
 # ── 注册 InboundHub 处理器：以后新增消息类型（如 diary），在这里多注册一个 ──
 inbound_hub.register(P.TYPE_MESSAGE, lambda ws, user, data: _handle_message(user, data))
@@ -164,13 +167,16 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         echo_async(user.id, "user", content)
 
         # 1.6 人工接管：该会话存在 handling（人工处理中）事件 → agent 层 interrupt
-        #     （图在 wait_human 节点用 LangGraph 原生 interrupt 暂停，不产自动回复），
-        #     这里落一条系统提示并推送；运营提交干预结果（resolved）后 handling 消失，
-        #     下一条消息不再传 human_takeover，agent 自动回复自动恢复
-        if any(e.conversation_id == conv.id for e in crisis_repo.list_by_status(db, user.id, "handling")):
+        #     （图在 wait_human 节点用 LangGraph 原生 interrupt 暂停，不产自动回复）。
+        #     提示去重：handling 期间用户每发一条消息都会走到这里，不判重会反复推送
+        #     "已转人工"——同一接管周期只提示一次，恢复/再次接管时重新提示。
+        handling = crisis_repo.list_by_status(db, user.id, "handling")
+        if any(e.conversation_id == conv.id for e in handling):
+            key = (user.id, conv.id)
             user_profile = {"nickname": user.nickname, "avatar": user.avatar}
             reply = await generate_reply(content, user_profile, human_takeover=True, user_id=user.id)
-            if reply is None:
+            if reply is None and key not in _takeover_tip_sent:
+                _takeover_tip_sent.add(key)
                 tip = message_repo.insert_one(db, conv.id, "system", "人工客服已接管对话，请稍候，会由人工回复你。")
                 conversation_repo.update_last_message(db, conv, tip.content)
                 await outbound_hub.send_message(user.id, conv.id, {
@@ -180,6 +186,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
                     "time": tip.time,
                 })
             return
+        # 该会话已不在接管中 → 清掉提示标记（下次再被接管会重新提示一次）
+        _takeover_tip_sent.discard((user.id, conv.id))
 
         # 2. 取最近历史上下文（供安全检测 + agent 复用）
         history = [

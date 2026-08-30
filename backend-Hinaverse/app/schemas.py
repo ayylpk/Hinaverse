@@ -14,6 +14,10 @@ from pydantic import BaseModel, ConfigDict, Field
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
     password: str = Field(..., min_length=6, max_length=128)
+    # 运营台首管理员注册：缺省 False = 普通用户注册（用户端行为完全不变）；
+    # True 时走部署码校验链（码非空→码相等→全库无 admin），通过才创建 role=admin
+    is_admin: bool = False
+    init_code: str | None = None
 
 
 class LoginRequest(BaseModel):

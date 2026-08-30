@@ -125,7 +125,10 @@ export const useChatStore = defineStore('chat', () => {
     if (convId && convId !== conversationId.value) return // 不是当前会话的消息，忽略
     const msg = data.msg as ChatMessage | undefined
     if (!msg || typeof msg.content !== 'string') return
-    messages.value.push({ id: msg.id, role: 'hina', content: msg.content, time: msg.time })
+    // role 用后端给的值（hina / system），不要硬编码 hina：
+    // 人工接管的提示与运营回复都是 role=system，硬编码会把"已转人工"显示成日奈在说
+    const role: MessageRole = msg.role === 'system' ? 'system' : 'hina'
+    messages.value.push({ id: msg.id, role, content: msg.content, time: msg.time })
     sending.value = false
   }
 

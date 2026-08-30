@@ -1,5 +1,5 @@
 """
-认证路由：注册 / 登录 / 当前用户 / 修改资料。
+认证路由：注册 / 登录 / 当前用户 / 修改资料 / 首管理员注册状态。
 数据访问全部走 user_repo（DAO）。
 """
 import random
@@ -7,6 +7,7 @@ import random
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app import config
 from app.database import get_db
 from app.models import User
 from app.repositories import user_repo
@@ -29,11 +30,34 @@ def _random_nickname() -> str:
     return f"{prefix}·{suffix}"
 
 
+@router.get("/admin-register-status")
+def admin_register_status(db: Session = Depends(get_db)) -> dict:
+    """首管理员注册通道是否开放：无 admin 用户 且 部署码已配置。
+    运营台登录页据此决定是否展示「注册管理员」入口。"""
+    return {"open": (not user_repo.has_admin(db)) and bool(config.ADMIN_INIT_CODE)}
+
+
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 def register(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthResponse:
-    """注册：用户名唯一，密码 bcrypt 哈希，昵称随机生成，头像空串"""
+    """注册：用户名唯一，密码 bcrypt 哈希，昵称随机生成，头像空串。
+    is_admin=True 时按序校验部署码链（任一不过即拒绝，防止恶意抢先注册管理员）：
+        ① 部署码已配置（否则通道关闭）  ② 请求码与配置码相等  ③ 全库无 admin
+    is_admin 缺省/False：与历史行为完全一致（恒创建普通 user）。"""
     if user_repo.get_by_username(db, body.username):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="用户名已被使用")
+
+    role = "user"
+    if body.is_admin:
+        # ① 通道必须已配置（未配置 = 通道关闭）
+        if not config.ADMIN_INIT_CODE:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="管理员注册未开放")
+        # ② 请求携带的部署码必须与配置码一致
+        if body.init_code != config.ADMIN_INIT_CODE:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="邀请码错误")
+        # ③ 全库只能有一个管理员（首个注册后通道永久关闭）
+        if user_repo.has_admin(db):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="已存在管理员，注册通道关闭")
+        role = "admin"
 
     user = user_repo.create(
         db,
@@ -42,6 +66,12 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> AuthRespon
         nickname=_random_nickname(),
         avatar="",
     )
+    # role 通过 ORM 对象直接写入（create 不支持 role 参数，避免污染普通注册签名）
+    if role == "admin":
+        user.role = "admin"
+        db.commit()
+        db.refresh(user)
+
     token = create_access_token(user.id)
     return AuthResponse(token=token, user=UserOut.model_validate(user))
 

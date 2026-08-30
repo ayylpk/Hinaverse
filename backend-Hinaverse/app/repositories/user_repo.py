@@ -56,3 +56,8 @@ def set_reg_id(db: Session, user: User, reg_id: str) -> None:
 def list_all(db: Session) -> list[User]:
     """全量用户（日终压缩等定时任务遍历用）"""
     return list(db.execute(select(User).order_by(User.id)).scalars())
+
+
+def has_admin(db: Session) -> bool:
+    """全库是否存在 role='admin' 的用户（首管理员注册通道开关依据）"""
+    return db.execute(select(User.id).where(User.role == "admin").limit(1)).scalar_one_or_none() is not None

@@ -2,6 +2,9 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
+// ⚠️ 显式 import ElMessageBox 不走 unplugin 按需样式注入（resolver 只管模板组件/自动导入），
+// 必须手动带组件样式，否则 message-box 裸奔错位（确认框跑到屏幕左侧被遮挡）。
+import 'element-plus/es/components/message-box/style/css'
 import { Calendar, Tickets } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'

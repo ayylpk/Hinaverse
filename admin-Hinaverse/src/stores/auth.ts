@@ -1,7 +1,9 @@
 /**
- * 认证 store（运营台）：登录 / 当前用户 / 退出。
+ * 认证 store（运营台）：登录 / 首管理员注册 / 当前用户 / 退出。
  * 与后端 auth.py 对齐：
  *   POST /api/auth/login → 200 { token, user }   （账号密码错 → 401）
+ *   POST /api/auth/register → 201 { token, user }（is_admin=true 走部署码链）
+ *   GET  /api/auth/admin-register-status → { open }（首管理员注册通道）
  *   GET  /api/auth/me    → 200 UserOut            （带 Bearer token，含 role）
  *
  * token 存 localStorage('hina_token' / 'hina_user')，与用户端同 key。
@@ -50,6 +52,22 @@ export const useAuthStore = defineStore('auth', () => {
     applyAuth(data)
   }
 
+  /** 首管理员注册（is_admin=true 走部署码链，失败抛 ApiError 展示后端 detail） */
+  async function registerAdmin(username: string, password: string, initCode: string): Promise<void> {
+    const data = await http.post<{ token: string; user: AuthUser }>('/api/auth/register', {
+      username,
+      password,
+      is_admin: true,
+      init_code: initCode,
+    })
+    applyAuth(data)
+  }
+
+  /** 首管理员注册通道状态（无 admin 且已配置部署码时开放） */
+  async function fetchAdminRegStatus(): Promise<{ open: boolean }> {
+    return http.get<{ open: boolean }>('/api/auth/admin-register-status')
+  }
+
   /** 刷新页面后从后端拉最新资料（含 role，角色可能被运维改过） */
   async function fetchMe(): Promise<void> {
     if (!isLoggedIn.value) return
@@ -65,5 +83,5 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem(USER_KEY)
   }
 
-  return { token, user, isLoggedIn, isAdmin, login, fetchMe, logout }
+  return { token, user, isLoggedIn, isAdmin, login, registerAdmin, fetchAdminRegStatus, fetchMe, logout }
 })
