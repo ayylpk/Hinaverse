@@ -26,6 +26,15 @@ export interface ChatMessage {
   time: string
 }
 
+/**
+ * 后端 role → 前端展示 role 归一化：
+ *   user / system（接管提示、拦截语）原样；其余（hina、operator…）一律日奈气泡。
+ * operator=人工接管期运营代日奈发的回复——用户视角就是"日奈在说话"，同款左气泡。
+ */
+function normRole(r: string): MessageRole {
+  return r === 'user' || r === 'system' ? r : 'hina'
+}
+
 /** 后端 ConversationOut 的字段子集 */
 export interface ConversationInfo {
   id: number
@@ -76,7 +85,9 @@ export const useChatStore = defineStore('chat', () => {
     const hist = await http.get<{ messages: ChatMessage[]; has_more: boolean }>(
       `/api/conversations/${conv.id}/messages?limit=50`,
     )
-    messages.value = hist.messages
+    // 逐条 normRole：历史里运营回复是 operator（还有 hina/user/system），
+    // 不归一化的话刷新后 operator 命不中任何气泡样式（.bubble.operator 无 CSS）
+    messages.value = hist.messages.map((m) => ({ ...m, role: normRole(m.role) }))
 
     // 3. 未读清零（后台执行，失败不阻塞）+ 建立长连接
     http.post(`/api/conversations/${conv.id}/read`).catch(() => {})
@@ -125,9 +136,10 @@ export const useChatStore = defineStore('chat', () => {
     if (convId && convId !== conversationId.value) return // 不是当前会话的消息，忽略
     const msg = data.msg as ChatMessage | undefined
     if (!msg || typeof msg.content !== 'string') return
-    // role 用后端给的值（hina / system），不要硬编码 hina：
-    // 人工接管的提示与运营回复都是 role=system，硬编码会把"已转人工"显示成日奈在说
-    const role: MessageRole = msg.role === 'system' ? 'system' : 'hina'
+    // role 用后端给的值归一化（hina / operator → 日奈气泡；system 保持提示样式）：
+    // 接管提示是 role=system（居中），运营回复是 role=operator（和日奈同款左气泡），
+    // 二者后端已分角色，前端不再把运营回复画成"已转人工"那种系统提示。
+    const role: MessageRole = normRole(msg.role)
     messages.value.push({ id: msg.id, role, content: msg.content, time: msg.time })
     sending.value = false
   }

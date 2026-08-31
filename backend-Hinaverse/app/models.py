@@ -60,7 +60,8 @@ class Message(Base):
     conversation_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("conversations.id"), index=True, nullable=False
     )
-    # role: 'user' | 'hina' | 'system'，与前端 chat store 严格对齐
+    # role: 'user' | 'hina' | 'system'（拦截/接管提示） | 'operator'（运营人工回复，
+    # 用户端归入日奈气泡渲染），与前端 chat store 的映射逻辑严格对齐
     role: Mapped[str] = mapped_column(String(16), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     # time 字段存 HH:mm，前端直接显示

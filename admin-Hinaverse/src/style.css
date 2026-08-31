@@ -137,7 +137,11 @@ a {
 /* ============================================================
  * Element Plus 主题覆盖 —— 夜航配色
  * ============================================================ */
-:root {
+/* ⚠️ 必须同时挂 :root 和 html.dark 两个选择器：
+   Element Plus 的 dark css-vars.css（main.ts 引入）用 html.dark 定义变量，
+   只写 :root 会被它盖回 EP 默认值——详情抽屉白底浅字看不清就是这么来的 */
+:root,
+html.dark {
   --el-color-primary: #f2b04c;
   --el-color-primary-light-3: #ffc87a;
   --el-color-primary-light-5: rgba(242, 176, 76, 0.4);

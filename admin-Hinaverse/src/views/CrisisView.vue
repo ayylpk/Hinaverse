@@ -116,9 +116,12 @@ async function submitIntervention() {
   }
 }
 
-/** 消息气泡角色文案 */
+/** 消息气泡角色文案（operator=运营人工代日奈发的回复） */
 function roleLabel(m: CrisisMessage): string {
-  return m.role === 'user' ? '用户' : m.role === 'hina' ? '日奈' : '系统'
+  if (m.role === 'user') return '用户'
+  if (m.role === 'hina') return '日奈'
+  if (m.role === 'operator') return '运营'
+  return '系统'
 }
 
 // ── 实时性：30s 轮询 + 页面切回前台立即刷新（静默，不盖 loading）──

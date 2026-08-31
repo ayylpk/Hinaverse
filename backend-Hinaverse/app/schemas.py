@@ -128,7 +128,7 @@ class CrisisInterventionRequest(BaseModel):
 
 
 class CrisisReplyRequest(BaseModel):
-    """运营人工回复：以 system 角色落库并实时推送到用户端"""
+    """运营人工回复：以 operator 角色落库并实时推送到用户端（用户端按日奈气泡展示）"""
     content: str = Field(..., min_length=1, max_length=2000)
 
 

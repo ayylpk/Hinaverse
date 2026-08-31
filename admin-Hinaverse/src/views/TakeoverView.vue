@@ -4,7 +4,7 @@
  * - 待接管队列：GET /api/crisis?status_filter=pending_human（handling 天然不进队列）
  * - 点击接管 → POST /api/crisis/{id}/takeover {takeover:true} 成功后写本地接管列表（快照，真状态以后端为准）
  * - 我的接管：可同时接管多个用户/事件；被他人接管的事件点进来会 409「已被接管」，自动刷新队列
- * - 对话：GET /api/crisis/{id} 快照 + 运营回复走 POST /api/crisis/{id}/reply（system 角色实时推用户端）
+ * - 对话：GET /api/crisis/{id} 快照 + 运营回复走 POST /api/crisis/{id}/reply（operator 角色实时推用户端）
  * - 提交干预结果 → 复用 POST /api/crisis/{id}/intervention → resolved 后移出接管
  * - 实时性：30s 轮询队列（静默刷新）+ 页面切回前台立即刷新
  */
@@ -154,7 +154,7 @@ function removeLocalRecord(key: string) {
   void loadQueue(true)
 }
 
-/** 发送运营回复：落库 system 消息并实时推送用户端，成功后追加到本地对话（按 id 去重） */
+/** 发送运营回复：落库 operator 消息并实时推送用户端，成功后追加到本地对话（按 id 去重） */
 async function sendReply() {
   const content = replyInput.value.trim()
   const key = selectedId.value
@@ -197,9 +197,9 @@ async function submitIntervention() {
   }
 }
 
-/** 角色文案（运营回复以 system 角色落库） */
+/** 角色文案（operator=运营人工代日奈回复；system=接管提示等系统语） */
 function roleLabel(role: string): string {
-  return role === 'user' ? '用户' : role === 'hina' ? '日奈' : role === 'system' ? '运营' : '系统'
+  return role === 'user' ? '用户' : role === 'hina' ? '日奈' : role === 'operator' ? '运营' : '系统'
 }
 
 const displayMessages = computed(() => selectedDetail.value?.messages ?? [])
@@ -344,7 +344,7 @@ onUnmounted(() => {
                   v-for="m in displayMessages"
                   :key="m.id"
                   class="chat-row"
-                  :class="{ 'from-user': m.role === 'user', 'from-hina': m.role === 'hina', 'from-system': m.role === 'system' }"
+                  :class="{ 'from-user': m.role === 'user', 'from-hina': m.role === 'hina', 'from-operator': m.role === 'operator', 'from-system': m.role === 'system' }"
                 >
                   <span class="chat-role">{{ roleLabel(m.role) }}</span>
                   <div class="chat-bubble">{{ m.content }}</div>
@@ -608,7 +608,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 10px;
 }
-/* 消息左右规则（以 role 判定）：user → 左；hina / system → 右（人工顶替日奈原位置） */
+/* 消息左右规则（以 role 判定）：user → 左；hina / operator / system → 右（人工顶替日奈原位置） */
 .chat-row {
   display: flex;
   flex-direction: column;
@@ -620,6 +620,7 @@ onUnmounted(() => {
   align-items: flex-start;
 }
 .chat-row.from-hina,
+.chat-row.from-operator,
 .chat-row.from-system {
   align-self: flex-end;
   align-items: flex-end;
@@ -647,11 +648,17 @@ onUnmounted(() => {
   border: 1px solid var(--nv-border);
   border-bottom-right-radius: 4px; /* 尾巴朝右（日奈在右） */
 }
-.from-system .chat-bubble {
+.from-operator .chat-bubble {
   background: var(--nv-lilac-soft);
   color: var(--nv-lilac);
   border: 1px solid rgba(185, 165, 224, 0.4);
   border-bottom-right-radius: 4px; /* 人工顶替日奈，继续在右 */
+}
+.from-system .chat-bubble {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--nv-text-muted);
+  border: 1px dashed var(--nv-border);
+  border-bottom-right-radius: 4px;
 }
 .chat-time {
   font-size: 11px;

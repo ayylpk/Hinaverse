@@ -111,7 +111,8 @@ async def reply_crisis_event(
 ) -> MessageOut:
     """
     运营人工回复（仅管理员）：
-    以 system 角色落库（用户端已有气泡渲染），更新会话最后一条，
+    以 operator 角色落库——用户端渲染成日奈同款气泡（接管期间人工=代日奈发言），
+    与 system 角色的"人工客服已接管"提示区分开；更新会话最后一条，
     并实时推送给用户（在线 WS / 离线极光，走 outbound_hub 统一出口）。
     """
     event = crisis_repo.get_by_id(db, event_id)
@@ -120,11 +121,11 @@ async def reply_crisis_event(
     if event.conversation_id is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该事件无关联会话")
 
-    msg = message_repo.insert_one(db, event.conversation_id, "system", body.content)
+    msg = message_repo.insert_one(db, event.conversation_id, "operator", body.content)
     conv = conversation_repo.get_by_id(db, event.conversation_id)
     if conv is not None:
         conversation_repo.update_last_message(db, conv, body.content)
-    # 推送给用户端（type=message，前端按普通气泡渲染 system 角色）
+    # 推送给用户端（type=message，前端把 operator 归到日奈气泡样式渲染）
     await outbound_hub.send_message(event.user_id, event.conversation_id, {
         "id": msg.id,
         "role": msg.role,

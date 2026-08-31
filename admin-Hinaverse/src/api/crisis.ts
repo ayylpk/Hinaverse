@@ -75,7 +75,7 @@ export function markIntervention(
   })
 }
 
-/** 运营人工回复（仅管理员）：以 system 角色落库并实时推送到用户端 */
+/** 运营人工回复（仅管理员）：以 operator 角色落库，用户端按日奈气泡实时推送 */
 export function sendCrisisReply(eventId: number, content: string): Promise<CrisisMessage> {
   return http.post<CrisisMessage>(`/api/crisis/${eventId}/reply`, { content })
 }

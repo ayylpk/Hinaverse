@@ -205,7 +205,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         # ── 分支 A：违禁词拦截 ──
         if safety.blocked:
             # 不进入 agent，记录事件后直接返回拦截提示
-            crisis_repo.create(
+            # upsert_open：同用户已有未关闭事件则就地升级，不再新增（防一账号多事件）
+            crisis_repo.upsert_open(
                 db, user.id, conv.id, safety.risk_level,
                 trigger=safety.reason, signal=safety.signal, status="pending_human",
             )
@@ -218,8 +219,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
             recent_10 = "\n".join(f"{h['role']}: {h['content']}" for h in history[-10:])
             summary = await generate_high_risk_summary(recent_10)
             high_risk_repo.create_summary(db, user.id, summary)
-            # 2. 危机事件落库（pending_human，人工入口记录；summary 存新摘要）
-            crisis_repo.create(
+            # 2. 危机事件落库（upsert_open：同用户单开放事件，已有则升级到高危+补摘要）
+            crisis_repo.upsert_open(
                 db, user.id, conv.id, "高危",
                 trigger=safety.reason, signal=safety.signal,
                 status="pending_human", summary={"quick_summary": summary},
@@ -231,8 +232,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
             needs_deep_comfort = safety.risk_level in ("中危", "低危")
             high_risk = False
             if needs_deep_comfort:
-                # 落库危机事件（LLM 安抚中）
-                crisis_repo.create(
+                # 落库危机事件（LLM 安抚中）；已有开放事件则只升级不新增
+                crisis_repo.upsert_open(
                     db, user.id, conv.id, safety.risk_level,
                     trigger=safety.reason, signal=safety.signal, status="comforting",
                 )
