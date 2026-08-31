@@ -34,10 +34,12 @@ export class ApiError extends Error {
   }
 }
 
-const TOKEN_KEY = 'hina_token'
-const USER_KEY = 'hina_user'
+// ⚠️ key 必须和主站（hina_token/hina_user）区分：生产两站在同一 origin（www.sorasakihina.cn），
+// localStorage 不分路径，撞 key 会互踩 token（曾致运营台请求带着用户端 token 被 403）。
+export const TOKEN_KEY = 'hina_admin_token'
+export const USER_KEY = 'hina_admin_user'
 
-/** 从 localStorage 读 token（与用户端同 key，反正不同端口互不干扰） */
+/** 从 localStorage 读 token（每次现读，保证退出登录/401 清理立即生效） */
 function authHeader(): Record<string, string> {
   const token = localStorage.getItem(TOKEN_KEY)
   return token ? { Authorization: `Bearer ${token}` } : {}
@@ -48,8 +50,11 @@ function handleUnauthorized() {
   if (localStorage.getItem(TOKEN_KEY)) {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
-    if (window.location.pathname !== '/login') {
-      window.location.href = '/login'
+    // ⚠️ 生产部署在 /admin/ 子路径，写死 '/login' 会跳到主站登录页；
+    // BASE_URL 就是 vite.config 的 base（'/admin/'），拼出来的才是运营台自己的路由
+    const loginPath = `${import.meta.env.BASE_URL}login`
+    if (window.location.pathname !== loginPath) {
+      window.location.href = loginPath
     }
   }
 }

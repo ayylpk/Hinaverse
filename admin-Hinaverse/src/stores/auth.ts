@@ -6,15 +6,13 @@
  *   GET  /api/auth/admin-register-status → { open }（首管理员注册通道）
  *   GET  /api/auth/me    → 200 UserOut            （带 Bearer token，含 role）
  *
- * token 存 localStorage('hina_token' / 'hina_user')，与用户端同 key。
+ * token 存 localStorage('hina_admin_token' / 'hina_admin_user')。
+ * ⚠️ 不能和主站共用 hina_token：生产同域名下 localStorage 不分路径，会互踩。
  * 运营台登录后必须校验 role === "admin"，非管理员一律登出。
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { http, type AuthUser } from '@/api/http'
-
-const TOKEN_KEY = 'hina_token'
-const USER_KEY = 'hina_user'
+import { http, TOKEN_KEY, USER_KEY, type AuthUser } from '@/api/http'
 
 /** 从 localStorage 恢复已保存的用户；格式坏了就返回 null */
 function loadSavedUser(): AuthUser | null {

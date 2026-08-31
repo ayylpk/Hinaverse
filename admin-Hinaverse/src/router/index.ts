@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { TOKEN_KEY, USER_KEY } from '@/api/http'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -32,8 +33,8 @@ const router = createRouter({
  * - 登录页且已有 admin 凭证 → 直达列表
  */
 router.beforeEach((to) => {
-  const token = localStorage.getItem('hina_token')
-  const userRaw = localStorage.getItem('hina_user')
+  const token = localStorage.getItem(TOKEN_KEY)
+  const userRaw = localStorage.getItem(USER_KEY)
   let role = ''
   try {
     role = userRaw ? (JSON.parse(userRaw) as { role?: string }).role ?? '' : ''
@@ -46,8 +47,8 @@ router.beforeEach((to) => {
   }
   // 有 token 但非 admin：本地凭证不可用，清掉回登录页（真正的 403 由后端兜底）
   if (to.name !== 'Login' && token && role !== 'admin') {
-    localStorage.removeItem('hina_token')
-    localStorage.removeItem('hina_user')
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
     return { name: 'Login' }
   }
   if (to.name === 'Login' && token && role === 'admin') {
