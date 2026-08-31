@@ -8,6 +8,9 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
+  // 生产部署在 nginx 的 /admin/ 子路径（主前端占根路径）。
+  // 不设 base 的话 index.html 会去根路径拿 /assets/*，和主前端的 dist 撞车。
+  base: '/admin/',
   plugins: [
     vue(),
     AutoImport({

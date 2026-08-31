@@ -1,0 +1,30 @@
+# 镜像只需要 backend-Hinaverse + agent-Hinaverse 两个源码目录
+# （前端产物走 nginx 静态托管，不进镜像——对齐 AgentMemory 8/29 部署形态）
+.git
+.gitignore
+
+# 密钥绝不打进镜像层：服务器上一切配置走 compose env_file 注入
+.env
+**/.env
+
+# 前端/运营台（本机构建后 scp dist，服务器不需要源码进镜像）
+frontend-Hinaverse/
+admin-Hinaverse/
+
+# Python 运行垃圾与本机开发残留
+**/__pycache__/
+**/.venv/
+backend-Hinaverse/*.log
+backend-Hinaverse/hina.db
+backend-Hinaverse/tests/
+agent-Hinaverse/data/
+agent-data/
+**/*.db
+**/*.sqlite*
+
+# 任务书/笔记（不参与构建）
+*.md
+AGENT_TASK_PROMPT.md
+前端修改任务书-20260830.md
+prompt.txt
+.workbuddy/

@@ -20,7 +20,8 @@ const routes: RouteRecordRaw[] = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  // '/admin/' 与 vite.config.ts 的 base 对应：路由跳转/刷新都带子路径前缀
+  history: createWebHistory('/admin/'),
   routes,
 })
 

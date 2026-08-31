@@ -1,0 +1,31 @@
+# Hinaverse 生产部署（腾讯云 140.143.190.188）
+# 前置：
+#   1. AgentMemory 的 compose 在跑（提供 mysql 容器 + agentmemory_default 网络）
+#   2. 同目录写好 .env（参考 .env.example）
+#   3. mysql 里已建 hinaverse 库（见部署步骤，或首次启动由 create_all 自动建表）
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hinaverse-backend
+    restart: unless-stopped
+    ports:
+      # 端口规划（8/29 拍板）：一后端一宿主端口从 3000 起；AgentMemory=3000，Hinaverse=3001
+      # nginx 门卫按 127.0.0.1:3001 反代 /api 与 /ws
+      - "3001:8000"
+    env_file:
+      - .env
+    volumes:
+      # 图引擎 LangGraph checkpoint（hina_checkpoints.db）必须出容器持久化，
+      # 否则每次 rebuild 丢光会话短期记忆
+      - ./agent-data:/app/agent-Hinaverse/data
+    networks:
+      - default
+      # 挂进 AgentMemory 网络：直接按容器名访问 mysql 与 am-backend，不走公网回环
+      - agentmemory
+
+networks:
+  agentmemory:
+    external: true
+    name: agentmemory_default
