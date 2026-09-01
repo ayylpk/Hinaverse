@@ -245,4 +245,40 @@ function onCommand(cmd: string) {
   position: relative;
   z-index: 1;
 }
+
+/* ---------- 手机适配（≤768px）：只新增分支，>768px 桌面走不到这里 ---------- */
+@media (max-width: 768px) {
+  .nav-bar {
+    /* 刘海/状态栏避让（配合 viewport-fit=cover） */
+    height: calc(54px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+  .nav-inner {
+    padding: 0 12px;
+  }
+  .brand {
+    gap: 8px;
+  }
+  .brand-cn {
+    white-space: nowrap; /* 治「日奈宇宙」一字一行竖排 */
+    letter-spacing: 1px;
+  }
+  .brand-en {
+    display: none;
+  }
+  .nav-link {
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+  .user-name,
+  .caret {
+    display: none; /* 窄屏只留头像当入口 */
+  }
+  .user-area {
+    padding: 6px;
+  }
+  .main {
+    padding: 12px 10px 16px;
+  }
+}
 </style>

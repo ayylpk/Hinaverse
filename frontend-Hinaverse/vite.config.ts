@@ -39,4 +39,17 @@ export default defineConfig({
       },
     },
   },
+  // vite preview 同样要代理（本地起 dist 做移动端视口截图验收时用）
+  preview: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
+      '/ws': {
+        target: 'ws://localhost:8000',
+        ws: true,
+      },
+    },
+  },
 })

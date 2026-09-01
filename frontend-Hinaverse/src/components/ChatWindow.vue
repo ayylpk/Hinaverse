@@ -501,4 +501,36 @@ function onKeydown(e: KeyboardEvent) {
     display: none;
   }
 }
+
+/* ---------- 手机适配（≤768px）：只新增分支，桌面零改动 ---------- */
+@media (max-width: 768px) {
+  .chat-window {
+    /* dvh = 动态视口：软键盘弹出时窗口跟着缩，输入框不被键盘埋掉（套壳第一顽疾的解） */
+    height: calc(100dvh - 96px - env(safe-area-inset-top));
+    min-height: 0; /* 撤掉 560px 桌面下限，窄屏不再撑出 shrink-to-fit */
+    border-radius: 16px;
+  }
+  .chat-header {
+    padding: 10px 14px;
+    gap: 12px;
+  }
+  .message-list {
+    padding: 16px 12px;
+    gap: 14px;
+  }
+  .bubble-wrap {
+    max-width: 82%;
+  }
+  .chat-footer {
+    /* 底部预留安卓手势条/键盘区域 */
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+  }
+  .foot-row {
+    display: none; /* 「Enter 发送」快捷键提示手机上纯属噪音 */
+  }
+  .send-btn {
+    padding: 0 16px;
+    letter-spacing: 0;
+  }
+}
 </style>

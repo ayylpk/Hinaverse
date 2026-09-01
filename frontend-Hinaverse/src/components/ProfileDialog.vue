@@ -9,6 +9,9 @@ const emit = defineEmits<{ 'update:modelValue': [val: boolean] }>()
 
 const auth = useAuthStore()
 
+/** 弹窗宽度：窄屏（含手机壳）给 92%，桌面维持 460px 原设计 */
+const dialogWidth = window.innerWidth <= 640 ? '92%' : '460px'
+
 const nickname = ref(auth.profile.nickname)
 const avatar = ref(auth.profile.avatar)
 const currentPwd = ref('')
@@ -88,7 +91,7 @@ async function onSave() {
   <el-dialog
     :model-value="modelValue"
     title="个人资料"
-    width="460px"
+    :width="dialogWidth"
     :close-on-click-modal="false"
     @close="close"
   >

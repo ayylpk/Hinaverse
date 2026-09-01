@@ -446,4 +446,53 @@ onMounted(load)
   font-size: 12px;
   color: var(--nv-text-muted);
 }
+
+/* ---------- 手机适配（≤768px）：双栏并排 → 单列竖排，桌面零改动 ---------- */
+@media (max-width: 768px) {
+  .nav-bar {
+    height: calc(54px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+  .nav-inner {
+    padding: 0 12px;
+  }
+  .brand-cn {
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  .brand-en {
+    display: none;
+  }
+  .nav-actions {
+    gap: 4px;
+  }
+  .nav-actions a {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .main {
+    padding: 12px 10px calc(24px + env(safe-area-inset-bottom));
+  }
+  .diary-shell {
+    flex-direction: column; /* 治点1：日历 440px 定宽 + 右栏并排把整页撑爆 */
+  }
+  .glass {
+    padding: 14px;
+  }
+  .calendar-panel {
+    flex: none;
+    width: 100%;
+  }
+  .grid {
+    min-height: 0; /* 轨道病根：aspect-ratio 格子 + 280px 高度保底 → 行高反灌列宽，窄屏必溢出 */
+  }
+  .list-panel {
+    min-height: 0;
+    width: 100%; /* 治点2：日记列表面板被压成 42px 隐形 → 挪到日历下方全宽 */
+  }
+  .empty-state {
+    padding: 32px 20px;
+  }
+}
 </style>

@@ -598,4 +598,60 @@ onMounted(load)
   font-size: 12px;
   color: var(--nv-text-muted);
 }
+
+/* ---------- 手机适配（≤768px）：固定框架双栏 → 整页滚动单列，桌面零改动 ---------- */
+@media (max-width: 768px) {
+  .checkin-page {
+    height: auto; /* 拆掉 100vh 固定框架（双栏内滚是桌面玩法） */
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .nav-bar {
+    height: calc(54px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+  .nav-inner {
+    padding: 0 12px;
+  }
+  .brand-cn {
+    white-space: nowrap;
+    letter-spacing: 1px;
+  }
+  .brand-en {
+    display: none;
+  }
+  .nav-actions {
+    gap: 4px;
+  }
+  .nav-actions a {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .main {
+    padding: 12px 10px calc(24px + env(safe-area-inset-bottom));
+  }
+  .checkin-shell {
+    flex-direction: column; /* 治「周六周日两列被裁」：440px 定宽日历撑爆 360 屏 */
+  }
+  .glass {
+    padding: 14px;
+  }
+  .calendar-panel {
+    flex: none;
+    width: 100%;
+  }
+  .grid {
+    min-height: 0; /* 轨道病根：aspect-ratio 星星格 + 300px 高度保底 → 行高反灌列宽，窄屏必溢出 */
+  }
+  .list-panel {
+    max-height: none; /* 面板内滚改随页滚，窄屏两层滚动是灾难 */
+  }
+  .items {
+    overflow: visible;
+  }
+  .empty-state {
+    padding: 32px 20px;
+  }
+}
 </style>

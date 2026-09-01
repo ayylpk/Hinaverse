@@ -336,3 +336,18 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------- 手机触感全局补丁（≤768px 才生效，桌面/平板零影响） ---------- */
+@media (max-width: 768px) {
+  html {
+    -webkit-text-size-adjust: 100%; /* 防横屏时 webkit 偷偷放大字号 */
+  }
+  body {
+    overscroll-behavior: none; /* 禁下拉橡皮筋回弹，去掉「网页感」 */
+  }
+  button,
+  a {
+    touch-action: manipulation; /* 干掉 300ms 延迟与双击缩放误触 */
+    -webkit-tap-highlight-color: transparent; /* 去掉安卓点按灰块 */
+  }
+}
