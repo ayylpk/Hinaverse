@@ -14,6 +14,7 @@ Hub 层：WS 消息的收发中心（两个 Hub）。
        不直接碰单个 websocket 连接。
     3. PushChannel 已瘦身为纯离线极光客户端，由 OutboundHub 持有作兜底。
 """
+import asyncio
 import logging
 from typing import Any, Awaitable, Callable
 
@@ -55,6 +56,8 @@ class OutboundHub:
         self._offline_push = offline_push  # 纯极光客户端，离线兜底
         # user_id -> WebSocket 连接（在线表）
         self._ws_connections: dict[int, Any] = {}
+        # user_id -> reg_id 查询回调（应用层启动时注入；Hub 自身不碰 DB）
+        self._reg_id_lookup: Callable[[int], str] | None = None
 
     # ── WS 连接管理 ──
 
@@ -68,6 +71,25 @@ class OutboundHub:
 
     def is_online(self, user_id: int) -> bool:
         return user_id in self._ws_connections
+
+    # ── reg_id 注入（修 9/1 断链：push_offline 只认 msg 里的 _reg_id）──
+
+    def register_reg_id_lookup(self, lookup: Callable[[int], str]) -> None:
+        """注册 reg_id 查询回调（user_id -> reg_id，查不到返回空串）。启动时挂，Hub 不 import DB。"""
+        self._reg_id_lookup = lookup
+
+    async def _with_reg_id(self, user_id: int, msg: dict[str, Any]) -> dict[str, Any]:
+        """降级极光前把用户 reg_id 塞进 msg；查库是同步操作，丢给线程池别堵事件循环。"""
+        if self._reg_id_lookup is None or msg.get("_reg_id"):
+            return msg
+        try:
+            reg_id = await asyncio.to_thread(self._reg_id_lookup, user_id)
+        except Exception as e:
+            logger.warning(f"[hub] 查 reg_id 失败（跳过极光注入）: {e}")
+            return msg
+        if reg_id:
+            msg = {**msg, "_reg_id": reg_id}  # 拷贝，不污染调用方 dict
+        return msg
 
     # ── 核心发送：所有下发最终都走这里 ──
 
@@ -85,9 +107,9 @@ class OutboundHub:
             except Exception as e:
                 logger.warning(f"[hub] WS 推送失败，尝试极光: {e}")
                 # WS 失败不移除连接，交给心跳机制清理；这里降级走极光
-                return await self._offline_push.push_offline(user_id, msg)
+                return await self._offline_push.push_offline(user_id, await self._with_reg_id(user_id, msg))
         # 离线：走极光
-        return await self._offline_push.push_offline(user_id, msg)
+        return await self._offline_push.push_offline(user_id, await self._with_reg_id(user_id, msg))
 
     # ── 协议便捷封装（对应用户可能收到的各类型）──
 

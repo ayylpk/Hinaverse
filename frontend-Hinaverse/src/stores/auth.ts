@@ -13,6 +13,7 @@
  */
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { bindDeviceForPush } from '@/api/device'
 import { http, type AuthUser } from '@/api/http'
 
 const TOKEN_KEY = 'hina_token'
@@ -32,6 +33,9 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem(TOKEN_KEY) || '')
   const user = ref<AuthUser | null>(loadSavedUser())
 
+  // 冷启动场景（token 还在 localStorage 里、不走登录）也要补绑极光
+  if (token.value) bindDeviceForPush()
+
   /** 有 token 就算已登录（token 过期与否由请求时的 401 触达） */
   const isLoggedIn = computed(() => !!token.value)
 
@@ -47,6 +51,8 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = data.user
     localStorage.setItem(TOKEN_KEY, data.token)
     localStorage.setItem(USER_KEY, JSON.stringify(data.user))
+    // 安卓壳里顺手绑定极光设备（浏览器里空操作，内部防重入）
+    bindDeviceForPush()
   }
 
   /** 登录：失败抛 ApiError（401 detail 是「账号或密码不正确」） */

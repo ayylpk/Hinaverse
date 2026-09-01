@@ -38,11 +38,28 @@ async def _daily_summary_loop() -> None:
         await asyncio.sleep(60)
 
 
+# ── 极光 reg_id 查询回调：喂给 OutboundHub 降级前注入（Hub 不碰 DB，9/1 断链修复）──
+
+
+def _lookup_user_reg_id(user_id: int) -> str:
+    """按用户查 reg_id，查不到/未注册返回空串（push_offline 会跳过）。同步函数，Hub 会丢线程池调用。"""
+    from app.database import SyncSessionLocal
+    from app.repositories import user_repo
+
+    with SyncSessionLocal() as db:
+        user = user_repo.get_by_id(db, user_id)
+        return (user.reg_id or "") if user else ""
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期：启动建表 + 日终定时任务 + 离开落盘扫描"""
     init_db()
     logging.getLogger(__name__).info("数据库表已就绪")
+    from app.ws.Hub import outbound_hub
+
+    outbound_hub.register_reg_id_lookup(_lookup_user_reg_id)
+    logging.getLogger(__name__).info("极光 reg_id 查询回调已挂 OutboundHub")
     daily_task = asyncio.create_task(_daily_summary_loop())
     logging.getLogger(__name__).info("日终定时任务已启动（每天 24:00）")
     inactive_task = asyncio.create_task(inactive_scan_loop())

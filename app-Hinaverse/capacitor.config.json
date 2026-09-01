@@ -1,0 +1,13 @@
+{
+  "appId": "cn.sorasakihina.app",
+  "appName": "日奈宇宙",
+  "webDir": "www",
+  "server": {
+    "url": "https://www.sorasakihina.cn"
+  },
+  "plugins": {
+    "JPush": {
+      "appKey": "a66d87113ab675262d9bfe62"
+    }
+  }
+}
