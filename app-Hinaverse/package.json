@@ -15,5 +15,8 @@
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
     "capacitor-plugin-jpush": "^4.0.1"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5"
   }
 }
