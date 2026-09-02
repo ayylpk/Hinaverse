@@ -1,4 +1,4 @@
-# Hinaverse 生产部署（腾讯云 140.143.190.188）
+# Hinaverse 生产部署（腾讯云，域名 www.sorasakihina.cn）
 # 前置：
 #   1. AgentMemory 的 compose 在跑（提供 mysql 容器 + agentmemory_default 网络）
 #   2. 同目录写好 .env（参考 .env.example）
