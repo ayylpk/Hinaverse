@@ -106,12 +106,28 @@ class CrisisEvent(Base):
 
 
 class SendMessage(Base):
-    """极简消息存取（sendMessage 接口）：id / user_id / content。"""
+    """主动关心消息队列（send_messages）——「存数据库 + 统一扫描触发」的存储层。
+
+    生命周期：spontaneous 节点产出成品正文 → accept_spontaneous 校验后落库(pending)
+    → active_message_loop 每分钟扫到点 → 落会话+推送(sent)；
+    用户再说话则撤销(cancelled)；错过发送窗(静默/危机)超期作废(expired)。
+    任意时刻每用户至多一条 pending（生成前撤销旧的，保证唯一）。
+    """
     __tablename__ = "send_messages"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, index=True, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # 送达时间（生成时由 LLM 定时、backend 校验窗口）
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # 队列状态机：pending → sent / cancelled(用户又说话了/重试烧完) / expired(错过发送窗)
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "sent", "cancelled", "expired", name="send_msg_status"),
+        default="pending", nullable=False,
+    )
+    # 推送失败计数：≥3 次标 cancelled，不再重试（防坏数据卡扫描）
+    fail_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
 
 class Diary(Base):

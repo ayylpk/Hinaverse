@@ -142,14 +142,18 @@ class CrisisTakeoverRequest(BaseModel):
 # ═══════════════════════════════════════
 
 class SendMessageCreate(BaseModel):
-    """插入消息：user_id 不传（由 JWT token 决定当前用户）"""
+    """插入消息：user_id 不传（由 JWT token 决定当前用户）；scheduled_at = 期望送达时间"""
     content: str = Field(..., min_length=1, max_length=10000)
+    scheduled_at: datetime
 
 
 class SendMessageOut(BaseModel):
     id: int
     user_id: int
     content: str
+    scheduled_at: datetime
+    status: str
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

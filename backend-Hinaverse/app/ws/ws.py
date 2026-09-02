@@ -31,6 +31,7 @@ from app.repositories import (
     crisis_repo,
     high_risk_repo,
     message_repo,
+    send_message_repo,
     user_repo,
 )
 from app.security import decode_token
@@ -162,6 +163,10 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         # 1. 落库用户消息 + 更新会话最后一条
         message_repo.insert_one(db, conv.id, "user", content)
         conversation_repo.update_last_message(db, conv, content)
+
+        # 1.2 主动关心撤销：人都来聊天了，就不用发消息关心了——
+        #     作废 TA 名下所有待发送的 pending（聊完这轮会重新想一条，见 active_message）
+        send_message_repo.cancel_pending(db, user.id)
 
         # 1.5 记忆管线回显（后台异步，不阻塞回复；role 分清是谁说的话）
         echo_async(user.id, "user", content)

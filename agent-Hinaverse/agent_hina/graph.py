@@ -16,6 +16,7 @@ agent_graph.py —— 日奈 AI（心理健康陪伴者）LangGraph 主图
 
 记忆闭环:
     对话结束 → backend 异步 run_memory_compression：
+        spontaneous（先想一条"等会儿关心什么"，交 backend 定时发送）
         save_memory（轻度压缩 short → 追加 long）
         long ≥ 3 条 → reduce_memory（中度压缩覆盖 long）
     每天日终 → daily_compress（定时任务触发）
@@ -156,6 +157,9 @@ async def run_memory_compression(
 
     流程：
         1. 读当前 thread 的 checkpoint state
+        1.5 自主关心 spontaneous_thought_node（⚠️ 必须在 save 之前：
+            趁 short_session_memory 还没被压缩清空才有东西可惦记）
+            → 产物 _spontaneous 只随返回值交还 backend 落库，不写 checkpoint
         2. need_to_save_memory 为 True → save_memory_node（short 轻度压缩 → 追加 long）
         3. long ≥ COMPRESS_THRESHOLD → reduce_memory_node（中度压缩覆盖 long）
         4. 写回 checkpoint
@@ -164,7 +168,8 @@ async def run_memory_compression(
         config = {"configurable": {"thread_id": f"user_{uid}"}}
         asyncio.create_task(run_memory_compression(config))
 
-    返回本次实际执行的压缩更新 dict（无更新返回 {}）。
+    返回本次实际执行的压缩更新 dict（无更新返回 {}）；
+    自主关心产物以 "_spontaneous" 键混在返回值里（一次性，不属于 state 更新）。
     """
     if graph is None:
         graph = await build_hina_graph()
@@ -176,6 +181,13 @@ async def run_memory_compression(
         return {}
 
     updates: dict[str, Any] = {}
+
+    # ── 1.5 自主关心（先想，再压缩；失败/不关心返回 {}，绝不影响后续）──
+    from agent_hina.nodes.spontaneous import spontaneous_thought_node
+    sp_updates = spontaneous_thought_node(state)  # type: ignore
+    if sp_updates.get("_spontaneous"):
+        # ⚠️ 只放进返回值，不 aupdate_state —— _spontaneous 是一次性投递物，不是记忆
+        updates["_spontaneous"] = sp_updates["_spontaneous"]
 
     # ── 2. 需要存记忆 → save（short → long）──
     if state.get("need_to_save_memory"):

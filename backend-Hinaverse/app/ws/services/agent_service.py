@@ -136,7 +136,33 @@ async def generate_reply(
     if not reply:
         reply = "嗯，我在听。慢慢说，不着急。"
 
-    # ── 2. 后台异步压缩（回复已到手，不阻塞返回）──
-    asyncio.create_task(run_memory_compression(config, graph))
+    # ── 2. 后台收尾流（回复已到手，不阻塞返回）：记忆压缩 + 自主关心落库 ──
+    if user_id is not None:
+        asyncio.create_task(_post_chat_flow(config, graph, user_id))
+    else:
+        # dev 兜底线程（无 user_id）：保持原行为只压缩，主动关心没处落库
+        asyncio.create_task(run_memory_compression(config, graph))
 
     return reply
+
+
+async def _post_chat_flow(config: RunnableConfig, graph, user_id: int) -> None:
+    """
+    对话收尾后台任务（fire-and-forget，任何失败只记日志）：
+        1. run_memory_compression：自主关心思考 → save → reduce（agent 层，零 DB）
+        2. 接住返回值里的 _spontaneous（一次性投递物）→ active_message 校验落库（backend 层）
+    agent 不碰库、backend 不碰提示词，分层与 daily_summary 的 _daily_summary_text 同模式。
+    """
+    from app.services.active_message import accept_spontaneous
+
+    try:
+        updates = await run_memory_compression(config, graph)
+    except Exception as e:
+        print(f"  [agent_service] 收尾压缩失败: {e}")
+        return
+    sp = updates.get("_spontaneous")
+    if sp:
+        try:
+            accept_spontaneous(user_id, sp)  # 同步毫秒级；不过检自然返回 None，无需补救
+        except Exception as e:
+            print(f"  [agent_service] 主动关心落库失败: {e}")

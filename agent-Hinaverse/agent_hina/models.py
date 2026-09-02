@@ -34,3 +34,5 @@ ask_human_model = create_model(0.5)
 reduce_model = create_model(0.0, timeout=300)
 #写日记/日终总结（内容大，给更长超时）
 write_model = create_model(0.9, timeout=300)
+#自主关心（对话收尾想一句"等会儿关心什么"，短输出；高温度要人味）
+spontaneous_model = create_model(0.9)

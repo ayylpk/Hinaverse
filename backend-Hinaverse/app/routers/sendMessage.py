@@ -25,7 +25,8 @@ def insert_message(
     db: Session = Depends(get_db),
 ) -> SendMessageOut:
     """插入一条消息（user_id 取 token 中的当前用户，防越权），返回带 id 的记录"""
-    msg = send_message_repo.create(db, user_id=current_user.id, content=body.content)
+    msg = send_message_repo.create(db, user_id=current_user.id, content=body.content,
+                                   scheduled_at=body.scheduled_at)
     return SendMessageOut.model_validate(msg)
 
 

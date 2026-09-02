@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import CORS_ORIGINS
 from app.database import init_db
 from app.routers import auth, checkin, conversations, crisis, device, dev, dairy, sendMessage
+from app.services.active_message import active_message_loop
 from app.services.inactive_memory import inactive_scan_loop
 from app.ws.ws import router as ws_router
 
@@ -64,9 +65,12 @@ async def lifespan(app: FastAPI):
     logging.getLogger(__name__).info("日终定时任务已启动（每天 24:00）")
     inactive_task = asyncio.create_task(inactive_scan_loop())
     logging.getLogger(__name__).info("离开落盘扫描已启动（每 10 分钟扫描离线超时用户）")
+    active_task = asyncio.create_task(active_message_loop())
+    logging.getLogger(__name__).info("主动关心扫描已启动（每 1 分钟扫描到点消息）")
     yield
     daily_task.cancel()
     inactive_task.cancel()
+    active_task.cancel()
 
 
 app = FastAPI(title="Hinaverse Backend", version="0.1.0", lifespan=lifespan)

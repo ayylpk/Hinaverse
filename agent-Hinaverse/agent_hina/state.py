@@ -33,3 +33,6 @@ class AgentState(TypedDict):
                                                 # 直到运营提交干预结果（resolved）后 handling 消失才恢复
     daily_archive: list                         # 日终总结存档：每天日清时 append 当日总结，次日第一条消息注入系统提示
                                                 # （持续上下文，让日奈记得"昨天聊了什么"；日清保留它）
+    _spontaneous: dict                          # 对话收尾「自主关心」一次性产物 {content, time}：
+                                                # 随 run_memory_compression 返回值交 backend 落 send_messages，
+                                                # ⚠️ 不写回 checkpoint（不是记忆）
