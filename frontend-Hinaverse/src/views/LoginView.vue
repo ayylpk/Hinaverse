@@ -2,7 +2,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+// ⚠️ 图标不走 unplugin 自动注册，用到必须显式 import（同 HomeView 规矩）
+import { Cellphone, Lock, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { ApiError } from '@/api/http'
 import hinaMoon from '@/assets/img/hina-moon.png'
@@ -196,6 +197,14 @@ function switchMode() {
               还没有账号？
               <a class="switch-link" @click.prevent="switchMode">点亮一颗星</a>
             </template>
+          </p>
+
+          <!-- 安卓客户端入口：放在登录页是因为下载本身无需鉴权，新访客第一面就该能装。
+               壳内打开这页也无害——点了交给系统浏览器下最新包，等于顺手完成更新 -->
+          <p class="apk-line">
+            <a class="apk-link" href="/apk/hina.apk" download target="_blank">
+              <el-icon><Cellphone /></el-icon>手机上用：下载安卓客户端
+            </a>
           </p>
         </div>
       </section>
@@ -439,6 +448,28 @@ function switchMode() {
 }
 .switch-link:hover {
   color: var(--nv-text);
+}
+
+/* 下载客户端的低调一行：平时灰蓝虚线下划线，悬停点亮琥珀 */
+.apk-line {
+  text-align: center;
+  margin: 16px 0 0;
+}
+.apk-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--nv-text-muted);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--nv-border-strong);
+  padding-bottom: 2px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.apk-link:hover {
+  color: var(--nv-amber);
+  border-color: var(--nv-amber);
 }
 
 /* ---------------- 图片兜底：CSS 月亮 ---------------- */

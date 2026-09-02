@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+// ⚠️ 图标库不走自动注册，用到就得显式 import（同 HomeView 的规矩）
+import { Cellphone } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { ApiError } from '@/api/http'
 
@@ -134,6 +136,15 @@ async function onSave() {
           <el-input v-model="confirmPwd" type="password" placeholder="再次输入新密码" show-password />
         </el-form-item>
       </el-form>
+
+      <!-- 安卓客户端下载入口（与顶栏下拉「下载 App」同源链接；/apk/hina.apk 由 nginx 静态直出，发版覆盖文件即可） -->
+      <el-divider content-position="left">日奈宇宙 App</el-divider>
+      <div class="apk-row">
+        <p class="apk-tip">下载安卓客户端，用同一账号登录，让日奈更容易找到你。</p>
+        <a class="apk-btn" href="/apk/hina.apk" download target="_blank">
+          <el-icon><Cellphone /></el-icon>下载安卓安装包
+        </a>
+      </div>
     </div>
 
     <template #footer>
@@ -217,5 +228,41 @@ async function onSave() {
 
 .form {
   margin-top: 12px;
+}
+
+/* ---- App 下载区 ---- */
+.apk-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+
+.apk-tip {
+  margin: 0;
+  font-size: 12px;
+  color: var(--nv-text-muted);
+  text-align: center;
+  line-height: 1.7;
+}
+
+/* 锚点伪装主按钮：琥珀渐变胶囊，与头像描边/品牌色一致 */
+.apk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 24px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--nv-amber), var(--nv-amber-deep));
+  color: var(--nv-amber-ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+.apk-btn:hover {
+  box-shadow: 0 0 16px rgba(242, 176, 76, 0.35);
+  transform: translateY(-1px);
 }
 </style>

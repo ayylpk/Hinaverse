@@ -5,7 +5,9 @@ import { ElMessageBox } from 'element-plus'
 // ⚠️ 显式 import ElMessageBox 不走 unplugin 按需样式注入（resolver 只管模板组件/自动导入），
 // 必须手动带组件样式，否则 message-box 裸奔错位（确认框跑到屏幕左侧被遮挡）。
 import 'element-plus/es/components/message-box/style/css'
-import { Calendar, Tickets } from '@element-plus/icons-vue'
+// ⚠️ @element-plus/icons-vue 不走 unplugin 自动注册，模板用到的每个图标都必须在这里显式 import
+// （历史坑：ArrowDown/User/SwitchButton 曾漏 import，下拉菜单图标静默渲染成空标签，9/2 补齐）
+import { ArrowDown, Calendar, Cellphone, SwitchButton, Tickets, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useChatStore } from '@/stores/chat'
 import ChatWindow from '@/components/ChatWindow.vue'
@@ -87,6 +89,13 @@ function onCommand(cmd: string) {
             <el-dropdown-menu>
               <el-dropdown-item command="profile">
                 <el-icon><User /></el-icon>个人资料
+              </el-dropdown-item>
+              <el-dropdown-item>
+                <!-- APK 固定直链：服务器 nginx /apk/ 静态直出，更新版本只覆盖文件，链接永不写死版本号。
+                     target=_blank 是给安卓壳里用的——壳 WebView 直接导航安装包链接会卡住，必须交系统浏览器下载 -->
+                <a class="dropdown-link" href="/apk/hina.apk" download target="_blank">
+                  <el-icon><Cellphone /></el-icon>下载 App
+                </a>
               </el-dropdown-item>
               <el-dropdown-item divided command="logout">
                 <el-icon><SwitchButton /></el-icon>退出登录
@@ -229,6 +238,16 @@ function onCommand(cmd: string) {
 .nav-link:hover {
   background: var(--nv-amber-soft);
   color: var(--nv-amber);
+}
+
+/* 下拉菜单项里的锚点（下载 App）：继承菜单项文字颜色，图标与文字横排 */
+.dropdown-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  color: inherit;
+  text-decoration: none;
 }
 
 .caret {
