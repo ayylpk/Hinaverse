@@ -13,6 +13,8 @@ import {
   fetchCrisisDetail,
   markIntervention,
   INTERVENTION_OPTIONS,
+  CRISIS_STATUS_TEXT,
+  CRISIS_RISK_COLOR,
   type CrisisEvent,
   type CrisisEventDetail,
   type CrisisMessage,
@@ -44,18 +46,9 @@ const detail = ref<CrisisEventDetail | null>(null)
 const detailLoading = ref(false)
 const interventionResult = ref('')
 
-const statusText: Record<string, string> = {
-  pending_human: '待人工',
-  comforting: '安抚中',
-  handling: '处理中',
-  resolved: '已处理',
-}
-
-const riskColor: Record<string, string> = {
-  高危: '#ef4444',
-  中危: '#f59e0b',
-  低危: '#eab308',
-}
+// 状态/等级展示常量：与统计页共用 api/crisis.ts 一份源（别名保持模板不动）
+const statusText = CRISIS_STATUS_TEXT
+const riskColor = CRISIS_RISK_COLOR
 
 /** 格式化后端 ISO 时间为「YYYY-MM-DD HH:mm」 */
 function formatTime(iso: string | null | undefined): string {

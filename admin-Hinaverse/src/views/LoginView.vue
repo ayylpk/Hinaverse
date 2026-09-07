@@ -52,7 +52,7 @@ async function onSubmit() {
       return
     }
     ElMessage.success('欢迎回来，运营者')
-    router.push({ name: 'Crisis' })
+    router.push({ name: 'Dashboard' })
   } catch (e) {
     ElMessage.error(e instanceof ApiError ? e.detail : '网络开小差了，请稍后再试')
   } finally {
@@ -85,7 +85,7 @@ async function onRegister() {
     regLoading.value = true
     await auth.registerAdmin(username, regForm.value.password, regForm.value.initCode.trim())
     ElMessage.success('管理员注册成功，欢迎登船')
-    router.push({ name: 'Crisis' }) // 注册接口已返回 token，直接进入运营台
+    router.push({ name: 'Dashboard' }) // 注册接口已返回 token，直接进入运营台
   } catch (e) {
     ElMessage.error(e instanceof ApiError ? e.detail : '注册失败，请稍后再试')
   } finally {

@@ -8,7 +8,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/LoginView.vue'),
   },
   {
+    // 9/7 起统计页做门面：登录后第一眼是运营大盘，危机处理挪到 /crisis
     path: '/',
+    name: 'Dashboard',
+    component: () => import('@/views/DashboardView.vue'),
+  },
+  {
+    path: '/crisis',
     name: 'Crisis',
     component: () => import('@/views/CrisisView.vue'),
   },
@@ -52,7 +58,7 @@ router.beforeEach((to) => {
     return { name: 'Login' }
   }
   if (to.name === 'Login' && token && role === 'admin') {
-    return { name: 'Crisis' }
+    return { name: 'Dashboard' }
   }
 })
 

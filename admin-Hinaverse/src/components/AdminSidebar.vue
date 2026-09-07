@@ -1,10 +1,10 @@
 <script setup lang="ts">
-/** 运营台左侧边栏：logo + 菜单（危机事件 / 人工接管）+ 当前运营者 + 退出 */
+/** 运营台左侧边栏：logo + 菜单（运营大盘 / 危机事件 / 人工接管）+ 当前运营者 + 退出 */
 import { useRouter } from 'vue-router'
-import { Headset, User, Warning } from '@element-plus/icons-vue'
+import { DataBoard, Headset, User, Warning } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 
-defineProps<{ active: 'crisis' | 'takeover' }>()
+defineProps<{ active: 'dashboard' | 'crisis' | 'takeover' }>()
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -30,6 +30,10 @@ function onLogout() {
     </div>
 
     <nav class="menu">
+      <router-link class="menu-item" :class="{ active: active === 'dashboard' }" :to="{ name: 'Dashboard' }">
+        <el-icon><DataBoard /></el-icon>
+        <span>运营大盘</span>
+      </router-link>
       <router-link class="menu-item" :class="{ active: active === 'crisis' }" :to="{ name: 'Crisis' }">
         <el-icon><Warning /></el-icon>
         <span>危机事件</span>

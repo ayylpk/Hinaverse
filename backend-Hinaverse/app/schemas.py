@@ -199,3 +199,71 @@ class CheckinOut(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ═══════════════════════════════════════
+# 运营台统计（/api/admin，仅管理员）
+# ═══════════════════════════════════════
+
+class AdminStatsCards(BaseModel):
+    """指标卡六项：大盘快照（时间口径见 stats_repo 注释）"""
+    total_users: int
+    new_users_today: int
+    active_users_7d: int     # 近7天发过言（role=user）的去重用户
+    messages_7d: int         # 近7天消息总数（全 role）
+    open_crises: int         # 未关闭危机（pending_human/comforting/handling）
+    online_users: int        # 当前 WS 在线人数（内存直读，非 SQL）
+
+
+class AdminTrendPoint(BaseModel):
+    """7 日趋势单日：date 为 YYYY-MM-DD，缺日补零"""
+    date: str
+    new_users: int
+    messages: int
+    crises: int
+
+
+class AdminCrisisDist(BaseModel):
+    """危机分布一格：风险等级 × 状态 × 数量（全历史）"""
+    risk_level: str
+    status: str
+    count: int
+
+
+class AdminStatsOut(BaseModel):
+    """统计页一屏拿全：卡片 + 趋势 + 危机分布"""
+    cards: AdminStatsCards
+    trend: list[AdminTrendPoint]
+    crisis_dist: list[AdminCrisisDist]
+
+
+class AdminUserOut(BaseModel):
+    """用户表行：基础资料 + 活跃统计（msg_count/last_active 口径=role user）"""
+    id: int
+    username: str
+    nickname: str
+    role: str
+    created_at: datetime
+    last_active: datetime | None = None
+    msg_count: int = 0
+    crisis_count: int = 0
+
+
+class AdminUserPageOut(BaseModel):
+    total: int
+    page: int
+    size: int
+    items: list[AdminUserOut]
+
+
+class AdminUserDetailOut(BaseModel):
+    """用户详情抽屉：资料 + 跨会话最近 20 条消息 + 全部危机史（画像另走懒加载接口）"""
+    user: AdminUserOut
+    messages: list[MessageOut] = []
+    crises: list[CrisisEventOut] = []
+
+
+class AdminPortraitOut(BaseModel):
+    """画像转发：AgentMemory 不可达/无画像时 portrait=None，前端展示空态"""
+    user_id: int
+    portrait: str | None = None

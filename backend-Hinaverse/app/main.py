@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS
 from app.database import init_db
-from app.routers import auth, checkin, conversations, crisis, device, dev, dairy, sendMessage
+from app.routers import admin, auth, checkin, conversations, crisis, device, dev, dairy, sendMessage
 from app.services.active_message import active_message_loop
 from app.services.inactive_memory import inactive_scan_loop
 from app.ws.ws import router as ws_router
@@ -93,6 +93,7 @@ app.include_router(dev.router)
 app.include_router(sendMessage.router)
 app.include_router(dairy.router)
 app.include_router(checkin.router)
+app.include_router(admin.router)
 
 # WebSocket 路由
 app.include_router(ws_router)

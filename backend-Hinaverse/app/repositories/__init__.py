@@ -15,3 +15,4 @@ from app.repositories.send_message_repo import *
 from app.repositories.diary_repo import *
 from app.repositories.high_risk_repo import *
 from app.repositories.checkin_repo import *
+from app.repositories.stats_repo import *

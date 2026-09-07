@@ -21,17 +21,12 @@ from app.schemas import (
     CrisisTakeoverRequest,
     MessageOut,
 )
-from app.security import get_current_user
+from app.security import get_current_user, require_admin
 from app.ws.Hub import outbound_hub
 
 router = APIRouter(prefix="/api/crisis", tags=["crisis"])
 
-
-def require_admin(current_user: User = Depends(get_current_user)) -> User:
-    """管理员校验：非 admin 一律 403（叠加在 get_current_user 之上）"""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限，仅管理员可访问")
-    return current_user
+# require_admin 已上移到 app/security.py（admin 统计路由共用）
 
 
 def _with_nickname(out: CrisisEventOut, event) -> CrisisEventOut:

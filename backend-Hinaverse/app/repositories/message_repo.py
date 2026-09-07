@@ -69,6 +69,19 @@ def get_recent(db: Session, conversation_id: int, limit: int = 20) -> list[Messa
     return list(reversed(rows))
 
 
+def get_recent_for_user(db: Session, user_id: int, limit: int = 20) -> list[Message]:
+    """跨该用户所有会话取最近 limit 条（运营台用户详情抽屉用，正序返回）。
+    与 get_recent 的区别：按 user_id 经 conversations 连接，不绑单个会话。"""
+    rows = db.execute(
+        select(Message)
+        .join(Conversation, Conversation.id == Message.conversation_id)
+        .where(Conversation.user_id == user_id)
+        .order_by(Message.id.desc())
+        .limit(limit)
+    ).scalars().all()
+    return list(reversed(rows))
+
+
 def get_latest_activity(db: Session, user_id: int) -> datetime | None:
     """
     该用户所有会话的最新消息时间（离开判定用）。

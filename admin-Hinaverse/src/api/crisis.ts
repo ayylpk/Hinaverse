@@ -43,6 +43,21 @@ export interface CrisisEventDetail extends CrisisEvent {
 /** 干预结果可选项（落库为 intervention_result，选择即视为已处理） */
 export const INTERVENTION_OPTIONS = ['已联系用户', '已转介专业机构', '已联系家属', '误报', '其他处理'] as const
 
+/** 状态 → 中文（危机列表 / 接管页 / 统计页共用一份，别再各拷各的） */
+export const CRISIS_STATUS_TEXT: Record<string, string> = {
+  pending_human: '待人工',
+  comforting: '安抚中',
+  handling: '处理中',
+  resolved: '已处理',
+}
+
+/** 风险等级 → 主色（列表 tag 与统计页分布图同源取色） */
+export const CRISIS_RISK_COLOR: Record<string, string> = {
+  高危: '#ef4444',
+  中危: '#f59e0b',
+  低危: '#eab308',
+}
+
 /** 列表查询参数（与 crisis.py Query 参数对齐） */
 export interface CrisisListParams {
   status_filter?: string

@@ -66,6 +66,14 @@ def get_current_user(
     return user
 
 
+def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """管理员校验：非 admin 一律 403（叠加在 get_current_user 之上）。
+    crisis / admin 等运营端路由共用，别再各自复制一份。"""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权限，仅管理员可访问")
+    return current_user
+
+
 def extract_bearer_token(authorization: str | None) -> str | None:
     """从 Authorization header 提取 Bearer token，兼容 WS 场景"""
     if not authorization or not authorization.lower().startswith("bearer "):

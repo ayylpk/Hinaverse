@@ -72,6 +72,10 @@ class OutboundHub:
     def is_online(self, user_id: int) -> bool:
         return user_id in self._ws_connections
 
+    def online_count(self) -> int:
+        """当前在线用户数（一人一连接；运营台「当前在线」指标用，只读不改状态）"""
+        return len(self._ws_connections)
+
     # ── reg_id 注入（修 9/1 断链：push_offline 只认 msg 里的 _reg_id）──
 
     def register_reg_id_lookup(self, lookup: Callable[[int], str]) -> None:
