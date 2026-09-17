@@ -6,8 +6,6 @@ short_session_memory: 短会话记忆（对话结束清空，经轻度压缩存�
 long_session_memory:  长会话记忆（满阈值后中度压缩）
 need_to_save_memory:  LLM 判断本轮是否值得存入长期记忆
 needs_human:          是否需要暂停等用户确认
-mood:                 日奈现在的情绪
-status:               日奈现在在做什么
 tool_results:         本轮工具调用结果列表
 needs_deep_comfort:   中/低危安全检测命中时为 True，触发深度安抚模式提示词覆写
 """
@@ -22,8 +20,6 @@ class AgentState(TypedDict):
     long_session_memory: list                   # 长会话记忆（满 3 条后中度压缩覆盖）
     need_to_save_memory: bool
     needs_human: bool                           # 是否需要暂停等用户确认
-    mood: str                                   # 日奈现在的情绪
-    status: str                                 # 日奈现在在做什么
     tool_results: list                          # 本轮工具调用结果列表
     _daily_summary_text: str                    # 日终压缩产出的「给用户的日终陪伴总结」（backend 取走落库/推送）
     needs_deep_comfort: bool                    # 中/低危命中时由 backend 传入，触发深度安抚模式
@@ -33,6 +29,3 @@ class AgentState(TypedDict):
                                                 # 直到运营提交干预结果（resolved）后 handling 消失才恢复
     daily_archive: list                         # 日终总结存档：每天日清时 append 当日总结，次日第一条消息注入系统提示
                                                 # （持续上下文，让日奈记得"昨天聊了什么"；日清保留它）
-    _spontaneous: dict                          # 对话收尾「自主关心」一次性产物 {content, time}：
-                                                # 随 run_memory_compression 返回值交 backend 落 send_messages，
-                                                # ⚠️ 不写回 checkpoint（不是记忆）

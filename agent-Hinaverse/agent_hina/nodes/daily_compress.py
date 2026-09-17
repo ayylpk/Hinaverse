@@ -36,6 +36,35 @@ def daily_compress_node(state: AgentState) -> dict:
     now = datetime.now()
     date_str = now.strftime("%Y年%m月%d日")
 
+    # ── 修（2026-09-17）：无当日新对话 → 不产日记。
+    #   此前 long 里残留昨日摘要（日终覆盖产物）恒非空 → 没聊天也天天产日记。
+    #   当日原始对话 messages 为空即视为"今天没聊过"。
+    if not state.get("messages"):
+        short_now = state.get("short_session_memory", [])
+        if isinstance(short_now, list) and short_now:
+            # 保底：短对话压缩并入长对话（不产日记）
+            short_text = "\n".join(
+                [f"{m.get('role', '?')}: {m.get('content', '')}" for m in short_now if m.get("content")]
+            )
+            try:
+                merged = reduce_model.invoke(build_memory_daily_compress_prompt(short_text))
+                merged_summary = (merged.content or "").strip()  # type: ignore
+            except Exception as e:
+                print(f"  [daily_compress] 短对话保底压缩失败: {e}")
+                merged_summary = short_text[:500]
+            long_now = state.get("long_session_memory", [])
+            merged_long = (
+                list(long_now) + [{"role": "system", "content": merged_summary}]
+            ) if merged_summary else list(long_now)
+            print(f"  [daily_compress] 长期未联系：短对话已压缩并入长对话（{len(merged_summary)} 字），不产日记")
+            return {
+                "long_session_memory": merged_long,
+                "short_session_memory": [],
+                "_daily_summary_text": "",
+            }
+        print("  [daily_compress] 今日无新对话（messages/short 均空），跳过")
+        return {"_daily_summary_text": ""}
+
     # ── 取今日记忆 ──
     long_mem = state.get("long_session_memory", [])
     short_mem = state.get("short_session_memory", [])

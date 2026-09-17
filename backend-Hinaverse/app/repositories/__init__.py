@@ -11,7 +11,6 @@ from app.repositories.conversation_repo import *
 from app.repositories.message_repo import *
 from app.repositories.crisis_repo import *
 from app.repositories.daily_repo import *
-from app.repositories.send_message_repo import *
 from app.repositories.diary_repo import *
 from app.repositories.high_risk_repo import *
 from app.repositories.checkin_repo import *
