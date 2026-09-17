@@ -243,6 +243,6 @@ class AdminUserDetailOut(BaseModel):
 
 
 class AdminPortraitOut(BaseModel):
-    """画像转发：AgentMemory 不可达/无画像时 portrait=None，前端展示空态"""
+    """画像读取：hm_portrait 无记录（或查询失败）时 portrait=None，前端展示空态"""
     user_id: int
     portrait: str | None = None

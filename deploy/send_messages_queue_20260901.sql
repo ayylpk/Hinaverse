@@ -1,6 +1,6 @@
 -- 阶段 4：主动关心消息队列 —— send_messages 改造（2026-09-01）
--- 执行（服务器）：docker exec -i $(docker ps -qf name=mysql) mysql -uroot -p'<MYSQL_ROOT_PASSWORD>' hinaverse < send_messages_queue_20260901.sql
---   （密码见服务器 agentmemory 目录 .env 的 MYSQL_ROOT_PASSWORD，勿写进本文件）
+-- 执行（服务器）：docker exec -i am-mysql mysql -uroot -p'<MYSQL_ROOT_PASSWORD>' hinaverse < send_messages_queue_20260901.sql
+--   （密码见服务器 agentmemory 目录 .env 的 MYSQL_ROOT_PASSWORD，切勿写进本文件）
 -- 执行（本机开发库 hinaverse / 测试库 hinaverse_test 同理换库名）
 
 ALTER TABLE send_messages

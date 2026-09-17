@@ -5,7 +5,7 @@
  *   7 日趋势 / 危机分布 → echarts（按需引入 core+bar/line，canvas）
  *   用户表（搜索/分页）→ GET /users；点行开抽屉
  *   抽屉 → GET /users/{id}/detail 秒开 + GET /users/{id}/portrait 懒加载
- *          （画像跨服务最坏 3s，拆开加载：AgentMemory 挂了只空画像栏）
+ *          （画像读本库 hm_portrait 且带 5 分钟 TTL 缓存，拆开加载：画像为空只空画像栏）
  * 配色沿用夜航 token（--nv-*），图表色与危机页 tag 同源（CRISIS_RISK_COLOR）。
  */
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
@@ -375,11 +375,11 @@ onUnmounted(() => {
             </el-descriptions>
           </section>
 
-          <!-- 画像（懒加载：跨服务，失败/没有只空这一栏） -->
+          <!-- 画像（懒加载：读本库 hm_portrait，失败/没有只空这一栏） -->
           <section class="block">
             <h3 class="block-title">
               用户画像
-              <span class="block-hint">来自 AgentMemory · 服务端缓存 5 分钟</span>
+              <span class="block-hint">由分层记忆生成 · 服务端缓存 5 分钟</span>
             </h3>
             <div v-if="portraitLoading" class="portrait-loading">画像加载中…</div>
             <p v-else-if="portrait" class="portrait-text">{{ portrait }}</p>
