@@ -330,6 +330,84 @@ SAFETY_COMFORT_HIGH_LONG_PROMPT = """你是日奈，一位心理健康陪伴者�
 
 
 # ═══════════════════════════════════════════════════════════════════
+# 便捷构建函数 —— 把动态参数填入模板
+# ═══════════════════════════════════════════════════════════════════
+
+def build_memory_save_prompt(time: str, memory_content: str) -> str:
+    """save_memory: 对话结束轻度压缩 → JSON 记忆摘要"""
+    return MEMORY_SAVE_PROMPT.format(
+        time=time,
+        memory_content=memory_content,
+    )
+
+
+def build_memory_reduce_prompt(raw_text: str) -> str:
+    """reduce: 长记忆满阈值中度压缩"""
+    return MEMORY_REDUCE_PROMPT.format(raw_text=raw_text)
+
+
+def build_memory_daily_compress_prompt(long_memory_text: str) -> str:
+    """daily_compress: 日终轻度压缩（明日初始上下文）"""
+    return MEMORY_DAILY_COMPRESS_PROMPT.format(long_memory_text=long_memory_text)
+
+
+def build_daily_summary_prompt(
+    date_str: str,
+    long_memory_text: str,
+    relationship_context: str = "",
+) -> str:
+    """daily_compress: 给用户的日终陪伴总结"""
+    return DAILY_SUMMARY_PROMPT.format(
+        date=date_str,
+        long_memory_text=long_memory_text or "暂无记录",
+        relationship_context=relationship_context or "（暂无用户档案）",
+    )
+
+
+def build_ask_human_prompt(context_str: str) -> str:
+    """ask_human: 澄清问题的提示词"""
+    return ASK_HUMAN_CLARIFY_PROMPT.format(context_str=context_str)
+
+
+def build_safety_detect_prompt(
+    user_message: str,
+    recent_context: str = "",
+    keyword_hit: str = "无",
+    keyword_level: str = "无",
+) -> str:
+    """safety_guard: LLM 语义风险检测（第三道防线，最终定性）"""
+    return SAFETY_DETECT_PROMPT.format(
+        recent_context=recent_context or "（无历史上下文）",
+        user_message=user_message,
+        keyword_hit=keyword_hit or "无",
+        keyword_level=keyword_level or "无",
+    )
+
+
+def build_safety_comfort_low_prompt(user_message: str, recent_context: str = "") -> str:
+    """safety_guard: 中/低危深度安抚模式系统提示词覆写"""
+    return SAFETY_COMFORT_LOW_PROMPT.format(
+        user_message=user_message,
+        recent_context=recent_context or "（无历史上下文）",
+    )
+
+
+def build_safety_quick_summary_prompt(dialog_text: str) -> str:
+    """safety_guard: 高危快速摘要（最近对话浓缩为一段文本，落库用）"""
+    return SAFETY_QUICK_SUMMARY_PROMPT.format(dialog_text=dialog_text or "（无对话）")
+
+
+def build_safety_comfort_high_long_prompt(
+    user_message: str, recent_context: str = ""
+) -> str:
+    """safety_guard: 高危持续深度安抚（AI 继续陪伴 + 引导热线）"""
+    return SAFETY_COMFORT_HIGH_LONG_PROMPT.format(
+        user_message=user_message,
+        recent_context=recent_context or "（无历史上下文）",
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
 # 当前生效的系统提示词（单一模式）
 # ═══════════════════════════════════════════════════════════════════
 # 由 backend-Hinaverse 作为唯一服务调用本库，不再动态切换。
