@@ -1,13 +1,12 @@
 """
 运营台统计路由（/api/admin，仅管理员）：大盘指标 / 7日趋势 / 危机分布 / 用户表 / 用户详情 / 画像。
 
-原则（9/7 拍板）：
+原则（9/7 拍板，9/17 画像改本地）：
   - 统计全部确定性逻辑 → 纯 SQL 聚合走 stats_repo，不做缓存、不碰 LLM；
   - 「当前在线」直读 OutboundHub 连接表（内存即事实源，查库反而失真）；
-  - 画像零新业务逻辑 → 转发 ws 链路同款 agent_memory.get_portrait_cached，
-    项目 Key 留在服务端，浏览器永远拿不到；
-  - 抽屉拆两个接口：detail（本地 SQL，秒开）+ portrait（跨服务，懒加载），
-    AgentMemory 挂了只空一个画像栏，不拖垮整页。
+  - 画像读本库 hm_portrait（hina_memory 在对话收尾按档位产出），不再是跨服务转发；
+  - 抽屉拆两个接口：detail（本地 SQL，秒开）+ portrait（含 TTL 缓存，懒加载），
+    画像为空只空一个画像栏，不拖垮整页。
 """
 from datetime import datetime, time, timedelta
 
@@ -30,7 +29,7 @@ from app.schemas import (
     MessageOut,
 )
 from app.security import require_admin
-from app.services import agent_memory
+from app.hina_memory.service import portrait_cached
 from app.ws.Hub import outbound_hub
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -148,8 +147,7 @@ async def get_user_portrait(
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> AdminPortraitOut:
-    """画像转发：复用 ws 链路同款 TTL 缓存客户端，失败/无画像返回 None 走前端空态。
-    async 定义——httpx 3s 超时在事件循环里等，不吃线程池工位。"""
+    """画像读取：直读本库 hm_portrait（hina_memory 本地产出），失败/无画像返回 None 走前端空态。"""
     _get_user_or_404(db, user_id)
-    portrait = await agent_memory.get_portrait_cached(user_id)
+    portrait = portrait_cached(user_id)
     return AdminPortraitOut(user_id=user_id, portrait=portrait)

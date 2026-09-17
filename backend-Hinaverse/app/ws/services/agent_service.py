@@ -25,7 +25,7 @@ from langchain_core.runnables import RunnableConfig  # noqa: E402
 from langgraph.graph.state import CompiledStateGraph  # noqa: E402
 from langgraph.types import Command  # noqa: E402
 
-from app.services.agent_memory import get_portrait_cached  # noqa: E402
+from app.hina_memory.service import portrait_cached  # noqa: E402
 
 # ── 图实例单例：按"事件循环"缓存（每个 loop 最多 build 一次，多用户并发复用） ──
 # 生产 uvicorn 单 loop ≈ 全局一份，语义与旧版完全一致；
@@ -94,10 +94,10 @@ async def generate_reply(
     # wait_human（实测踩坑：干预结束后 agent 恢复不了）。显式覆盖 checkpoint 旧值。
     initial["human_takeover"] = human_takeover
 
-    # ── 画像回流：回复前取用户画像（TTL 缓存，绝大多数调用零网络；失败返回 None 走兜底）。
-    #    人工接管中断时不需要画像，跳过省一次网络 ──
+    # ── 画像回流：回复前取用户画像（本地库 + TTL 缓存；失败/无画像返回 None 走兜底）。
+    #    人工接管中断时不需要画像，跳过省一次查询 ──
     if user_id is not None and not human_takeover:
-        portrait = await get_portrait_cached(user_id)
+        portrait = portrait_cached(user_id)
         if portrait:
             initial["portrait"] = portrait
 

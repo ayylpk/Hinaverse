@@ -27,7 +27,7 @@ from agent_hina.prompts import (
     build_daily_summary_prompt,
 )
 
-# 用户画像：由 backend 从 AgentMemory 拉取后注入 AgentState.portrait（与 think.py 同一来源），
+# 用户画像：由 backend 从本库 hm_portrait 读取后注入 AgentState.portrait（与 think.py 同一来源），
 # 缺省时 build_daily_summary_prompt 内部兜底为「暂无用户档案」。
 
 

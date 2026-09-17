@@ -13,15 +13,39 @@
 # ============================================================
 
 from dataclasses import dataclass, field
+import os
+
+
+def _ints(name: str, default: tuple[int, ...]) -> tuple[int, ...]:
+    """环境变量覆盖用：'2,6,14' → (2,6,14)；非法/空取默认。"""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        values = tuple(int(x) for x in raw.split(",") if x.strip())
+    except ValueError:
+        return default
+    return values if values else default
+
+
+def _int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, "").strip() or default)
+    except ValueError:
+        return default
+
 
 # L1 推送的累计触发点（原文条数）：块大小 2,4,8,16,32 的累加
-L1_CHUNK_CUMULATIVE = (2, 6, 14, 30, 62)
+# 阈值可经环境变量覆盖（演示/调参用）；不设则用对齐过的默认值。
+L1_CHUNK_CUMULATIVE = _ints("HINA_MEM_L1_CUMULATIVE", (2, 6, 14, 30, 62))
 # L1 到顶后，L2 的推送间隔（原文条数）
-POST_CAP_INTERVAL = 32
+POST_CAP_INTERVAL = _int("HINA_MEM_L2_INTERVAL", 32)
 # L2 接收满几次生成/刷新画像
-PORTRAIT_EVERY = 4
+PORTRAIT_EVERY = _int("HINA_MEM_PORTRAIT_EVERY", 4)
 # 近期保护窗：最近 N 条原文不参与压缩
-RAW_WINDOW = 8
+RAW_WINDOW = _int("HINA_MEM_WINDOW", 8)
+# 画像字数硬上限：画像每轮回复都要塞进提示词，长了既贵又糊（超限先让模型压、再机械裁）
+PORTRAIT_MAX_CHARS = _int("HINA_MEM_PORTRAIT_MAX_CHARS", 300)
 
 ACTION_L1 = "l1_consolidate"
 ACTION_L2 = "l2_push"

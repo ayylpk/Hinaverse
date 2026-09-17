@@ -12,8 +12,7 @@ from sqlalchemy import delete, select
 
 from app.models import Checkin, Conversation, CrisisEvent, Message, User
 from app.repositories import conversation_repo, crisis_repo, message_repo, user_repo
-from app.services import agent_memory
-from tests.conftest import TestSyncSessionLocal
+from tests.conftest import TestSyncSessionLocal, delete_memory_rows
 
 PWD = "pass1234"
 
@@ -35,6 +34,7 @@ def sweep_adm():
         db.execute(delete(CrisisEvent).where(CrisisEvent.user_id.in_(ids)))
         db.execute(delete(Checkin).where(Checkin.user_id.in_(ids)))
         db.execute(delete(Conversation).where(Conversation.user_id.in_(ids)))
+        delete_memory_rows(db, ids)   # hm_* 同样挂在 users.id 上，先清再删用户
         db.execute(delete(User).where(User.id.in_(ids)))
         db.commit()
 
@@ -176,23 +176,28 @@ async def test_user_detail_and_404(client, sweep_adm):
 
 
 @pytest.mark.asyncio
-async def test_portrait_forwarding(client, sweep_adm, monkeypatch):
-    """画像转发：命中回显全文；AgentMemory 不可达（fake 返回 None）走空态；不存在的用户 404"""
+async def test_portrait_local_read(client, sweep_adm):
+    """画像本地读取：hm_portrait 有行 → 回显；无画像 → None 空态；不存在的用户 404"""
+    from app.hina_memory.models import HinaMemoryPortrait
+
     _, headers = await _register_token(client, "admroot_p")
     _promote_admin("admroot_p")
     ua_id, _ = await _register_token(client, "admpor_a")
     ub_id, _ = await _register_token(client, "admpor_b")
 
-    async def fake_cached(user_id: int):
-        return "画像：性格底色偏内敛，近期考研压力大" if user_id == ua_id else None
-
-    monkeypatch.setattr(agent_memory, "get_portrait_cached", fake_cached)
+    # 直接写一行画像（模拟 hina_memory 压缩到档位后的产出）
+    db = TestSyncSessionLocal()
+    try:
+        db.merge(HinaMemoryPortrait(user_id=ua_id, text="画像：性格底色偏内敛，近期考研压力大"))
+        db.commit()
+    finally:
+        db.close()
 
     r1 = await client.get(f"/api/admin/users/{ua_id}/portrait", headers=headers)
     assert r1.status_code == 200
     assert r1.json() == {"user_id": ua_id, "portrait": "画像：性格底色偏内敛，近期考研压力大"}
 
-    # 没画像/服务挂了都返回 None，HTTP 层不报错（前端画空态）
+    # 还没有画像的用户返回 None，HTTP 层不报错（前端画空态）
     r2 = await client.get(f"/api/admin/users/{ub_id}/portrait", headers=headers)
     assert r2.status_code == 200 and r2.json()["portrait"] is None
 

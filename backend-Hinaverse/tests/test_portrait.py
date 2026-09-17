@@ -26,63 +26,63 @@ def _run(coro):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# 1. get_portrait_cached —— TTL 缓存语义
+# 1. portrait_cached —— TTL 缓存语义（画像已本地化：查 hm_portrait，不再跨服务）
 # ═══════════════════════════════════════════════════════════════════
 
 def test_cache_hits_after_first_fetch(monkeypatch):
-    """首次拉取后 TTL 内不再发网络请求（调用计数验证）"""
-    import app.services.agent_memory as am
+    """首次读库后 TTL 内不再查库（调用计数验证）"""
+    from app.hina_memory import service as mem
 
     calls = {"n": 0}
 
-    async def fake_get_portrait(user_id):
+    def fake_portrait_of(user_id):
         calls["n"] += 1
         return "画像A"
 
-    monkeypatch.setattr(am, "get_portrait", fake_get_portrait)      # 拦截网络层
-    monkeypatch.setattr(am, "_PORTRAIT_CACHE", {})                  # 清缓存防跨测试污染
+    monkeypatch.setattr(mem, "portrait_of", fake_portrait_of)   # 拦截库读取层
+    monkeypatch.setattr(mem, "_PORTRAIT_CACHE", {})             # 清缓存防跨测试污染
 
-    r1 = _run(am.get_portrait_cached(1))
-    r2 = _run(am.get_portrait_cached(1))
+    r1 = mem.portrait_cached(1)
+    r2 = mem.portrait_cached(1)
     assert r1 == "画像A" and r2 == "画像A"
-    assert calls["n"] == 1, "TTL 内第二次调用不应重新拉取"
+    assert calls["n"] == 1, "TTL 内第二次调用不应重新查库"
 
 
 def test_cache_refetches_after_expiry(monkeypatch):
-    """TTL 过期后重新拉取并更新缓存"""
-    import app.services.agent_memory as am
+    """TTL 过期后重新读取并更新缓存"""
+    from app.hina_memory import service as mem
 
     values = iter(["画像A", "画像B"])
 
-    async def fake_get_portrait(user_id):
+    def fake_portrait_of(user_id):
         return next(values)
 
-    monkeypatch.setattr(am, "get_portrait", fake_get_portrait)
-    monkeypatch.setattr(am, "_PORTRAIT_CACHE", {})
-    monkeypatch.setattr(am, "_PORTRAIT_TTL", 0)  # 强制每次过期
+    monkeypatch.setattr(mem, "portrait_of", fake_portrait_of)
+    monkeypatch.setattr(mem, "_PORTRAIT_CACHE", {})
+    monkeypatch.setattr(mem, "_PORTRAIT_TTL", 0)  # 强制每次过期
 
-    r1 = _run(am.get_portrait_cached(1))
-    r2 = _run(am.get_portrait_cached(1))
+    r1 = mem.portrait_cached(1)
+    r2 = mem.portrait_cached(1)
     assert r1 == "画像A" and r2 == "画像B"
 
 
 def test_cache_fallback_to_stale_on_failure(monkeypatch):
-    """拉取失败：有旧值用旧值；无旧值返回 None（绝不抛出）"""
-    import app.services.agent_memory as am
+    """读取失败：有旧值用旧值；无旧值返回 None（绝不抛出）"""
+    from app.hina_memory import service as mem
 
-    async def fake_get_portrait(user_id):
-        return None  # 模拟 AgentMemory 拉取失败
+    def fake_portrait_of(user_id):
+        return None  # 模拟查库失败 / 该用户还没有画像
 
-    monkeypatch.setattr(am, "get_portrait", fake_get_portrait)
-    monkeypatch.setattr(am, "_PORTRAIT_CACHE", {})
-    monkeypatch.setattr(am, "_PORTRAIT_TTL", 0)
+    monkeypatch.setattr(mem, "portrait_of", fake_portrait_of)
+    monkeypatch.setattr(mem, "_PORTRAIT_CACHE", {})
+    monkeypatch.setattr(mem, "_PORTRAIT_TTL", 0)
 
     # 情况 1：无旧值 → None
-    assert _run(am.get_portrait_cached(1)) is None
+    assert mem.portrait_cached(1) is None
 
-    # 情况 2：有旧值（fetched_at=0 → 必然过期）+ 拉取失败 → 返回旧值
-    am._PORTRAIT_CACHE[2] = ("旧画像", 0.0)
-    assert _run(am.get_portrait_cached(2)) == "旧画像"
+    # 情况 2：有旧值（fetched_at=0 → 必然过期）+ 读取失败 → 返回旧值
+    mem._PORTRAIT_CACHE[2] = ("旧画像", 0.0)
+    assert mem.portrait_cached(2) == "旧画像"
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -132,13 +132,13 @@ async def test_generate_reply_injects_portrait(monkeypatch):
 
     drawn = {"n": 0}
 
-    async def fake_portrait(user_id):
+    def fake_portrait(user_id):
         drawn["n"] += 1
         return "这位用户喜欢深夜聊天，最近在准备考研"
 
     fake_graph = _FakeGraph()
     monkeypatch.setattr(svc, "_get_graph", lambda: _Awaited(fake_graph))
-    monkeypatch.setattr(svc, "get_portrait_cached", fake_portrait)
+    monkeypatch.setattr(svc, "portrait_cached", fake_portrait)
     monkeypatch.setattr(svc, "run_memory_compression", _noop_compression)
 
     reply = await svc.generate_reply("你好", {}, user_id=42)
@@ -154,13 +154,13 @@ async def test_generate_reply_skips_portrait_without_user_id(monkeypatch):
 
     drawn = {"n": 0}
 
-    async def fake_portrait(user_id):
+    def fake_portrait(user_id):
         drawn["n"] += 1
         return "不应被调用"
 
     fake_graph = _FakeGraph()
     monkeypatch.setattr(svc, "_get_graph", lambda: _Awaited(fake_graph))
-    monkeypatch.setattr(svc, "get_portrait_cached", fake_portrait)
+    monkeypatch.setattr(svc, "portrait_cached", fake_portrait)
     monkeypatch.setattr(svc, "run_memory_compression", _noop_compression)
 
     reply = await svc.generate_reply("你好", {}, user_id=None)

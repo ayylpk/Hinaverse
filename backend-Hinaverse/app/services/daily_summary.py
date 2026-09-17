@@ -23,7 +23,7 @@ from langchain_core.messages import RemoveMessage, SystemMessage
 
 from app.database import SyncSessionLocal
 from app.repositories import diary_repo, user_repo
-from app.services.agent_memory import get_portrait_cached
+from app.hina_memory.service import portrait_cached
 from app.ws.services.agent_service import _get_graph
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ async def _compress_one(user_id: int) -> None:
 
         # 画像回流：拉用户画像注入 state，日终总结据此写得更贴心（失败 None 走「暂无用户档案」兜底）
         initial: dict = {"messages": [SystemMessage(content=_DAILY_TRIGGER)]}
-        portrait = await get_portrait_cached(user_id)
+        portrait = portrait_cached(user_id)
         if portrait:
             initial["portrait"] = portrait
 

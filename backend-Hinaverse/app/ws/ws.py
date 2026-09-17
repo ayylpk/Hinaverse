@@ -34,7 +34,7 @@ from app.repositories import (
     user_repo,
 )
 from app.security import decode_token
-from app.services.agent_memory import echo_async
+from app.hina_memory.service import remember_async
 from app.ws.Hub import inbound_hub, outbound_hub
 from app.ws.services.agent_service import generate_reply
 from app.ws.services.safety_service import (
@@ -163,8 +163,8 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         message_repo.insert_one(db, conv.id, "user", content)
         conversation_repo.update_last_message(db, conv, content)
 
-        # 1.5 记忆管线回显（后台异步，不阻塞回复；role 分清是谁说的话）
-        echo_async(user.id, "user", content)
+        # 1.5 记忆入库（L0，后台异步，不阻塞回复；role 分清是谁说的话）
+        remember_async(user.id, "user", content)
 
         # 1.6 人工接管：该会话存在 handling（人工处理中）事件 → agent 层 interrupt
         #     （图在 wait_human 节点用 LangGraph 原生 interrupt 暂停，不产自动回复）。
@@ -260,8 +260,9 @@ async def _handle_message(user: User, data: dict[str, Any]) -> None:
         hina_msg = message_repo.insert_one(db, conv.id, "hina", reply)
         conversation_repo.update_last_message(db, conv, reply)
 
-        # 6.5 记忆管线回显（后台异步）：日奈的回复是 ai 角色
-        echo_async(user.id, "ai", reply)
+        # 6.5 记忆入库（L0，后台异步）：日奈的回复是 ai 角色。
+        #     触发档位（累计 2/6/14/30/62…）命中时，压缩与画像在同一个后台线程里跑。
+        remember_async(user.id, "ai", reply)
 
         # 7. 推送给前端
         await outbound_hub.send_message(user.id, conv.id, {

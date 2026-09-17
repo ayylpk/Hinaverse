@@ -48,14 +48,9 @@ JPUSH_URL = "https://api.jpush.cn/v3/push"
 # 前端开发端口，生产按需调整
 CORS_ORIGINS = os.getenv("HINA_CORS_ORIGINS", "*").split(",")
 
-# ── AgentMemory 记忆服务（外部，X-Project 租户隔离）──
-# 两个业务接口：
-#   POST /api/echo      推消息进记忆管线（L0→L1→L3 异步消化）
-#   GET  /api/portrait?userId=  查用户画像
-# 请求头：X-Project（表前缀隔离）+ X-Api-Key（项目专属密钥）。
-# Key 属于服务端配置，绝不下发到浏览器（前端只跟本后端说话）。
-# ⚠️ 默认值为空字符串：Key 必须由环境变量 / .env 提供（不入 git）；生产务必配置
-# 开发期指向本机 AgentMemory（bun run index.ts 默认端口 3001）；生产改为服务器地址
-AGENT_MEMORY_BASE_URL = os.getenv("AGENT_MEMORY_BASE_URL", "http://localhost:3001")
-AGENT_MEMORY_PROJECT = os.getenv("AGENT_MEMORY_PROJECT", "Hinaverse")
-AGENT_MEMORY_API_KEY = os.getenv("AGENT_MEMORY_API_KEY", "")
+# ── 分层记忆（app/hina_memory，本进程内建，不再依赖外部记忆服务）──
+# 阈值可经环境变量覆盖；不设则用与用户对齐过的默认值（见 hina_memory/scheduler.py）：
+#   HINA_MEM_L1_CUMULATIVE   L1 触发点，默认 "2,6,14,30,62"（块 2/4/8/16/32）
+#   HINA_MEM_L2_INTERVAL     L1 到顶后每 +N 条推 1 条进 L2，默认 32
+#   HINA_MEM_PORTRAIT_EVERY  L2 满几次生成/刷新画像，默认 4
+#   HINA_MEM_WINDOW          近期保护窗（最近 N 条不参与压缩），默认 8

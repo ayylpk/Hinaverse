@@ -11,6 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import CORS_ORIGINS
 from app.database import init_db
+# hina_memory 的表结构（hm_raw/hm_l1/hm_l2/hm_portrait/hm_state）随 init_db 的
+# create_all 一起建；import 即注册到 Base.metadata，不 import 则表不会被创建。
+from app.hina_memory import models as _hina_memory_models  # noqa: F401
 from app.routers import admin, auth, checkin, conversations, crisis, device, dairy
 from app.services.inactive_memory import inactive_scan_loop
 from app.ws.ws import router as ws_router

@@ -8,7 +8,7 @@ import os
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, delete
 from sqlalchemy.orm import sessionmaker
 
 from app.config import MYSQL_HOST, MYSQL_PASSWORD, MYSQL_PORT, MYSQL_USER
@@ -53,6 +53,25 @@ def _patch_ws_session(monkeypatch):
     import app.ws.ws as ws_mod
     monkeypatch.setattr(ws_mod, "SyncSessionLocal", TestSyncSessionLocal)
 
+    # 记忆模块（hina_memory）自己开 session 写 L0 / 读画像，同样钉到测试库，
+    # 免得测试期间往开发库 hinaverse 里写记忆；顺手清 TTL 缓存防用例间串味。
+    from app.hina_memory import service as mem
+    monkeypatch.setattr(mem, "_session", TestSyncSessionLocal)
+    monkeypatch.setattr(mem, "_PORTRAIT_CACHE", {})
+
+
+def delete_memory_rows(db, user_ids) -> None:
+    """删用户前先清分层记忆的从属行——hm_* 全部对 users.id 有外键，
+    不先删会以 1451（Cannot delete or update a parent row）卡住一切清理逻辑。"""
+    from app.hina_memory.models import (
+        HinaMemoryL1, HinaMemoryL2, HinaMemoryPortrait, HinaMemoryRaw, HinaMemoryState,
+    )
+    ids = list(user_ids)
+    if not ids:
+        return
+    for model in (HinaMemoryRaw, HinaMemoryL1, HinaMemoryL2, HinaMemoryPortrait, HinaMemoryState):
+        db.execute(delete(model).where(model.user_id.in_(ids)))
+
 
 @pytest.fixture
 def clean_users():
@@ -72,6 +91,7 @@ def clean_users():
         with TestSyncSessionLocal() as s:
             u = s.execute(select(User).where(User.username == name)).scalar_one_or_none()
             if u is not None:
+                delete_memory_rows(s, [u.id])
                 s.delete(u)
                 s.commit()
 

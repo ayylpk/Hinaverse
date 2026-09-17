@@ -114,6 +114,10 @@ export const useChatStore = defineStore('chat', () => {
         content: String(data.content ?? ''),
         time: nowTime(),
       })
+      // 系统提示是「本轮的终态回执」（违禁词拦截 / 会话不存在 / 接管提示），后端发完即 return，
+      // 不会再有任何 message 或 active 到达。不清 sending 的话「正在输入」会一直转、
+      // 输入框也一直锁着发不出下一条。
+      sending.value = false
     })
 
     // 连接状态：断线提示 + 重连成功后提示（只在真的经历了断线时提示一次）

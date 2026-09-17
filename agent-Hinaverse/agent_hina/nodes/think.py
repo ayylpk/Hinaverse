@@ -109,7 +109,7 @@ def agent_think_node(state: AgentState) -> dict:
         if not short_mem or short_mem[-1].get("content") != latest_text:
             short_mem.append({"role": "user", "content": latest_text})
 
-    # ── 用户画像（AgentMemory 生成，backend 每轮注入 AgentState.portrait；
+    # ── 用户画像（backend 读本库 hm_portrait，每轮注入 AgentState.portrait；
     #    缺省时提示词走「暂无用户档案」兜底）──
     relationship_context = state.get("portrait") or ""
 
